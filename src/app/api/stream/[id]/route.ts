@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   // 1. Strictly verify active authenticated session on every stream/range request (logout revokes immediately)
   const session = await getServerAuthSession(request);
@@ -22,7 +22,8 @@ export async function GET(
     );
   }
 
-  const movieId = decodeURIComponent(context.params.id || "").trim();
+  const { id } = await context.params;
+  const movieId = decodeURIComponent(id || "").trim();
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const serviceClient = createSupabaseServiceClient();
-    const userClient = createSupabaseSsrServerClient();
+    const userClient = await createSupabaseSsrServerClient();
     const db = serviceClient || userClient;
 
     if (db) {

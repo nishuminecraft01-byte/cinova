@@ -80,11 +80,11 @@ export function isSupabaseAuthConfigured(): boolean {
 /**
  * Next.js 14 App Router SSR Supabase client via @supabase/ssr.
  */
-export function createSupabaseSsrServerClient(): SupabaseClient | null {
+export async function createSupabaseSsrServerClient(): Promise<SupabaseClient | null> {
   const { url, anonKey, configured } = getSupabasePublicConfig();
   if (!configured || !url || !anonKey) return null;
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   return createServerClient(url, anonKey, {
     cookies: {
       getAll() {
@@ -461,7 +461,7 @@ export async function fetchVerifiedUserProfileWithDiagnostics(
       }
       refreshToken = request.cookies.get(SB_REFRESH_COOKIE)?.value;
     } else {
-      const cookieStore = cookies();
+      const cookieStore = await cookies();
       accessToken = cookieStore.get(SB_ACCESS_COOKIE)?.value;
       refreshToken = cookieStore.get(SB_REFRESH_COOKIE)?.value;
     }

@@ -11,13 +11,13 @@ import { TMDBConfigError, TMDBNotFoundError, tmdb } from "@/lib/api/tmdb-client"
 export const dynamic = "force-dynamic";
 
 interface MoviePageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: MoviePageProps): Promise<Metadata> {
-  const { slug } = params;
+  const { slug } = await params;
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   const normalizedTmdb = clean.replace(/^tmdb-(?:movie-)?/, "");
 
@@ -76,7 +76,7 @@ export async function generateMetadata({ params }: MoviePageProps): Promise<Meta
 }
 
 export default async function MovieDetailPage({ params }: MoviePageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   const normalizedTmdb = clean.replace(/^tmdb-(?:movie-)?/, "");
 

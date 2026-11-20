@@ -11,13 +11,13 @@ import { TMDBConfigError, TMDBNotFoundError, tmdb } from "@/lib/api/tmdb-client"
 export const dynamic = "force-dynamic";
 
 interface SeriesPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: SeriesPageProps): Promise<Metadata> {
-  const { slug } = params;
+  const { slug } = await params;
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   const normalizedTmdb = clean.replace(/^tmdb-(?:tv-|series-)?/, "");
 
@@ -76,7 +76,7 @@ export async function generateMetadata({ params }: SeriesPageProps): Promise<Met
 }
 
 export default async function SeriesDetailPage({ params }: SeriesPageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   const normalizedTmdb = clean.replace(/^tmdb-(?:tv-|series-)?/, "");
 

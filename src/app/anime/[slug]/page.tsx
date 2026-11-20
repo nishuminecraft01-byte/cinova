@@ -10,13 +10,13 @@ import { TMDBConfigError, TMDBNotFoundError, tmdb } from "@/lib/api/tmdb-client"
 export const dynamic = "force-dynamic";
 
 interface AnimePageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function AnimeDetailPage({ params }: AnimePageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   const normalizedTmdb = clean.replace(/^tmdb-(?:tv-|movie-|anime-)?/, "");
 

@@ -5,15 +5,16 @@ import { TMDBConfigError, tmdb } from "@/lib/api/tmdb-client";
 export const dynamic = "force-dynamic";
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     mediaType: string;
     id: string;
-  };
+  }>;
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {
-  const mediaType = (context.params.mediaType || "").trim().toLowerCase();
-  const rawId = (context.params.id || "").trim().replace(/^tmdb-(?:movie-|tv-)?/i, "");
+  const { mediaType: rawMediaType, id } = await context.params;
+  const mediaType = (rawMediaType || "").trim().toLowerCase();
+  const rawId = (id || "").trim().replace(/^tmdb-(?:movie-|tv-)?/i, "");
 
   if (mediaType !== "movie" && mediaType !== "tv") {
     return NextResponse.json(
