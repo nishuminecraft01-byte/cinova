@@ -8,8 +8,8 @@
     "build-css": "tailwindcss -i ./src/app/globals.css -o ./public/styles/globals.css --minify",
     "build": "npm run build-css && next build",
     "build:worker": "npm run build-css && opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
-    "preview": "opennextjs-cloudflare preview --dangerouslyUseUnsupportedNextVersion",
-    "deploy": "opennextjs-cloudflare deploy --dangerouslyUseUnsupportedNextVersion",
+    "preview": "npm run build:worker && wrangler dev",
+    "deploy": "npm run build:worker && wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
     "lint": "next lint"

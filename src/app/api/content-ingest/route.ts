@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from "next/server";
 import { POPULAR_TMDB_CATALOG } from "@/lib/tmdb";
