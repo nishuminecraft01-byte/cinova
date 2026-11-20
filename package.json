@@ -7,8 +7,10 @@
     "dev:local": "next dev",
     "build-css": "tailwindcss -i ./src/app/globals.css -o ./public/styles/globals.css --minify",
     "build": "npm run build-css && next build",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "package": "node scripts/create-deploy-zip.js",
+    "build:worker": "npm run build-css && opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
+    "preview": "opennextjs-cloudflare preview --dangerouslyUseUnsupportedNextVersion",
+    "deploy": "opennextjs-cloudflare deploy --dangerouslyUseUnsupportedNextVersion",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "start": "next start",
     "lint": "next lint"
   },
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.16",
+    "@opennextjs/cloudflare": "^1.20.18",
     "@types/node": "^20.17.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
