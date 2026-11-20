@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextResponse } from "next/server";
 import { syncEngine } from "@/lib/sync/sync-engine";
 import { SAMPLE_MOVIES } from "@/data/movies";

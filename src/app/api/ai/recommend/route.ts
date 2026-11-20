@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { POPULAR_TMDB_CATALOG, convertCatalogItemToMovie } from "@/lib/tmdb";

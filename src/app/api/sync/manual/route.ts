@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { syncEngine } from "@/lib/sync/sync-engine";
 import { requireAdminSession } from "@/lib/supabase-server";

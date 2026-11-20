@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { TMDBConfigError, tmdb } from "@/lib/api/tmdb-client";
 import { WorldwideMediaType, getCollectionPreset } from "@/lib/tmdb-worldwide";

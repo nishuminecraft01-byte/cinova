@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { TMDBConfigError, isTmdbConfigured, tmdb } from "@/lib/api/tmdb-client";

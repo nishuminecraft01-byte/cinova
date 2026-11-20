@@ -1,3 +1,5 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from "next/server";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { resolveStreamingServers } from "@/lib/streaming-servers";
