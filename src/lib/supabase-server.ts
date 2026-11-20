@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
@@ -558,10 +557,12 @@ export async function fetchVerifiedUserProfileWithDiagnostics(
     const provided = headerKey || bearerKey;
     if (!provided) return false;
 
-    const expectedBuf = Buffer.from(expectedKey);
-    const providedBuf = Buffer.from(provided);
-    if (expectedBuf.length !== providedBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, providedBuf);
+    if (expectedKey.length !== provided.length) return false;
+    let res = 0;
+    for (let i = 0; i < expectedKey.length; i++) {
+      res |= expectedKey.charCodeAt(i) ^ provided.charCodeAt(i);
+    }
+    return res === 0;
   }
 
   export interface AdminGuardResult {

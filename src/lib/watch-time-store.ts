@@ -1,4 +1,15 @@
-import crypto from "node:crypto";
+function generateUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+
 import {
   FREE_DAILY_WATCH_LIMIT_SECONDS,
   MembershipTier,
@@ -168,7 +179,7 @@ export function sanitizeViewerKey(userId?: string | null, cookieGuestId?: string
       return { viewerKey: `guest:${cleanedCookie}` };
     }
   }
-  const freshGuest = crypto.randomUUID();
+  const freshGuest = generateUUID();
   return {
     viewerKey: `guest:${freshGuest}`,
     newGuestCookieId: freshGuest,
@@ -308,7 +319,7 @@ export async function applyWatchTimeEvent(params: {
         rec.sessionState = "paused";
         rec.activeSessionId = null;
       } else {
-        rec.activeSessionId = crypto.randomUUID();
+        rec.activeSessionId = generateUUID();
         rec.sessionState = "playing";
       }
       rec.lastHeartbeatMs = nowMs;
@@ -340,7 +351,7 @@ export async function applyWatchTimeEvent(params: {
     } else {
       rec.sessionState = "playing";
       if (!rec.activeSessionId) {
-        rec.activeSessionId = sessionId || crypto.randomUUID();
+        rec.activeSessionId = sessionId || generateUUID();
       }
     }
     rec.lastHeartbeatMs = nowMs;
