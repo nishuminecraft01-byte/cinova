@@ -1,0 +1,42 @@
+# Vercel Deployment Ignore Rules
+# Exclude heavy dependencies and build caches from deployment upload
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+
+# Next.js build cache & outputs (Vercel builds its own fresh bundle)
+.next/
+.next-build/
+out/
+build/
+coverage/
+.cinova-data/
+
+# Local Environment & Secrets
+.env
+.env*.local
+*.pem
+*.key
+
+# Archives & Temporary files
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# TypeScript cache & logs
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

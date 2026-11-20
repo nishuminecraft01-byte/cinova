@@ -1,0 +1,674 @@
+// Prisma Schema for CINOVA Global Entertainment Discovery Platform
+// Unified, normalized PostgreSQL schema supporting multilingual localization,
+// regional defaults, verified audio/subtitle availability, anime enrichment,
+// regional availability, and persistent resumable synchronization.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==============================================================================
+// ENUMS
+// ==============================================================================
+
+enum ContentType {
+  MOVIE
+  SERIES
+  ANIME_MOVIE
+  ANIME_SERIES
+  DOCUMENTARY
+  SPECIAL
+  SHORT_FILM
+}
+
+enum ReleaseStatus {
+  RELEASED
+  AIRING
+  UPCOMING
+  PLANNED
+  CANCELLED
+}
+
+enum ExternalSourceType {
+  TMDB
+  TMDB_MOVIE
+  TMDB_TV
+  ANILIST
+  IMDB
+  MAL
+  TVDB
+  WIKIDATA
+}
+
+enum SyncStatus {
+  IDLE
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum PersonRole {
+  ACTOR
+  DIRECTOR
+  WRITER
+  PRODUCER
+  CREATOR
+  COMPOSER
+  VOICE_ACTOR
+}
+
+enum AudioType {
+  ORIGINAL
+  DUBBED
+  COMMENTARY
+  AUDIO_DESCRIPTION
+}
+
+enum SubtitleType {
+  STANDARD
+  FORCED
+  SDH_CC
+}
+
+enum AvailabilityStatus {
+  VERIFIED_AVAILABLE
+  UNVERIFIED
+  UNAVAILABLE
+  STALE
+}
+
+enum VerificationSource {
+  LICENSED_PROVIDER_METADATA
+  AUTHORIZED_MEDIA_MANIFEST
+  ADMIN_VERIFIED
+  CREATOR_DECLARATION
+  UNSPECIFIED
+}
+
+enum MonetizationType {
+  SUBSCRIPTION
+  RENTAL
+  PURCHASE
+  FREE_WITH_ADS
+  CINOVA_LICENSED
+}
+
+enum SafetyTier {
+  FAMILY_SAFE
+  TEEN_SAFE
+  GENERAL_MATURE
+  ADULT_BLOCKED
+}
+
+enum TrailerType {
+  TRAILER
+  TEASER
+  CLIP
+  FEATURETTE
+}
+
+// ==============================================================================
+// REFERENCE DATA: LANGUAGES, COUNTRIES, REGIONAL DEFAULTS
+// ==============================================================================
+
+model Language {
+  code          String  @id // ISO 639-1 or BCP-47 base code (e.g., "en", "hi", "mr", "ja")
+  iso639_2      String? // 3-letter ISO 639-2 code (e.g., "eng", "hin")
+  englishName   String
+  nativeName    String
+  isRtl         Boolean @default(false)
+  isUiSupported Boolean @default(false)
+  isActive      Boolean @default(true)
+
+  // Relations
+  originalContents      Content[]             @relation("OriginalLanguage")
+  contentLocalizations  ContentLocalization[]
+  seasonLocalizations   SeasonLocalization[]
+  episodeLocalizations  EpisodeLocalization[]
+  genreLocalizations    GenreLocalization[]
+  audioTracks           AudioTrack[]
+  subtitleTracks        SubtitleTrack[]
+  trailers              Trailer[]
+  defaultUiRegions      RegionalDefault[]     @relation("DefaultUiLang")
+  fallbackUiRegions     RegionalDefault[]     @relation("FallbackUiLang")
+  defaultAudioRegions   RegionalDefault[]     @relation("DefaultAudioLang")
+  secondaryAudioRegions RegionalDefault[]     @relation("SecondaryAudioLang")
+  defaultSubRegions     RegionalDefault[]     @relation("DefaultSubLang")
+
+  @@index([isActive])
+  @@index([isUiSupported])
+}
+
+model Country {
+  code        String  @id // ISO 3166-1 alpha-2 (e.g., "IN", "US", "JP", "FR", "DE")
+  englishName String
+  nativeName  String?
+  regionGroup String  // e.g., "SOUTH_ASIA", "NORTH_AMERICA", "EAST_ASIA", "EUROPE"
+  isActive    Boolean @default(true)
+
+  // Relations
+  originalContents       Content[]               @relation("OriginalCountry")
+  regionalDefault        RegionalDefault?
+  regionalCertifications RegionalCertification[]
+  regionalAvailabilities RegionalAvailability[]
+  userPreferences        UserPreference[]
+
+  @@index([regionGroup])
+  @@index([isActive])
+}
+
+model RegionalDefault {
+  countryCode                 String   @id
+  country                     Country  @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+  defaultUiLanguageCode       String
+  defaultUiLanguage           Language @relation("DefaultUiLang", fields: [defaultUiLanguageCode], references: [code])
+  fallbackUiLanguageCode      String   @default("en")
+  fallbackUiLanguage          Language @relation("FallbackUiLang", fields: [fallbackUiLanguageCode], references: [code])
+  defaultAudioLanguageCode    String
+  defaultAudioLanguage        Language @relation("DefaultAudioLang", fields: [defaultAudioLanguageCode], references: [code])
+  secondaryAudioLanguageCode  String?
+  secondaryAudioLanguage      Language? @relation("SecondaryAudioLang", fields: [secondaryAudioLanguageCode], references: [code])
+  defaultSubtitleLanguageCode String?
+  defaultSubtitleLanguage     Language? @relation("DefaultSubLang", fields: [defaultSubtitleLanguageCode], references: [code])
+  featuredLanguageCodes       Json?    // e.g., ["hi","en","mr","ta","te","ml","kn","bn","pa"]
+  updatedAt                   DateTime @updatedAt
+}
+
+// ==============================================================================
+// CORE CATALOG ENTITIES (CANONICAL RECORD — NO DUPLICATION PER LANGUAGE/REGION)
+// ==============================================================================
+
+model Content {
+  id                   String        @id @default(uuid())
+  slug                 String        @unique
+  title                String
+  englishTitle         String?
+  originalTitle        String?
+  tagline              String?
+  synopsis             String        @db.Text
+  posterUrl            String?
+  backdropUrl          String?
+  trailerUrl           String?
+  videoUrl             String?
+  type                 ContentType   @default(MOVIE)
+  status               ReleaseStatus @default(RELEASED)
+  releaseDate          DateTime?
+  releaseYear          Int
+  duration             Int?          // runtime in minutes
+  rating               String?       // canonical fallback rating (e.g. PG-13, TV-MA)
+  score                Float         @default(0.0)
+  voteCount            Int           @default(0)
+  popularityScore      Float         @default(0.0)
+  matchPercentage      Int           @default(95)
+  language             String        @default("English")
+  originalLanguageCode String?
+  originalLanguage     Language?     @relation("OriginalLanguage", fields: [originalLanguageCode], references: [code])
+  country              String?
+  originalCountryCode  String?
+  originalCountry      Country?      @relation("OriginalCountry", fields: [originalCountryCode], references: [code])
+  views                Int           @default(0)
+  isAdult              Boolean       @default(false)
+  isFeatured           Boolean       @default(false)
+  isTrending           Boolean       @default(false)
+  isPopular            Boolean       @default(false)
+  isUpcoming           Boolean       @default(false)
+  quality              String        @default("4K UHD")
+  audioSpecs           String        @default("Dolby Atmos 5.1")
+  metadataCompleteness Int           @default(0) // 0 - 100
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // 1-to-1 Subtype relations
+  movieDetails  Movie?
+  seriesDetails Series?
+  animeDetails  Anime?
+
+  // Normalized localization, media & availability relations
+  localizations          ContentLocalization[]
+  genres                 ContentGenre[]
+  productionCompanies    ContentProductionCompany[]
+  cast                   Cast[]
+  externalSources        ExternalSource[]
+  audioTracks            AudioTrack[]
+  subtitleTracks         SubtitleTrack[]
+  trailers               Trailer[]
+  regionalCertifications RegionalCertification[]
+  regionalAvailabilities RegionalAvailability[]
+
+  @@index([type])
+  @@index([status])
+  @@index([releaseYear])
+  @@index([score])
+  @@index([popularityScore])
+  @@index([isTrending])
+  @@index([isPopular])
+  @@index([isUpcoming])
+  @@index([isAdult])
+  @@index([country])
+  @@index([originalCountryCode])
+  @@index([language])
+  @@index([originalLanguageCode])
+  @@index([title])
+}
+
+model ContentLocalization {
+  id             String   @id @default(uuid())
+  contentId      String
+  content        Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  languageCode   String
+  language       Language @relation(fields: [languageCode], references: [code])
+  countryCode    String   @default("") // "" for language-wide, or ISO2 for regional variant (e.g. "BR", "MX")
+  localizedTitle String
+  tagline        String?
+  synopsis       String?  @db.Text
+  posterUrl      String?
+  backdropUrl    String?
+  source         String   @default("TMDB")
+  updatedAt      DateTime @updatedAt
+
+  @@unique([contentId, languageCode, countryCode])
+  @@index([languageCode])
+  @@index([localizedTitle])
+}
+
+model Movie {
+  id            String  @id @default(uuid())
+  contentId     String  @unique
+  content       Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  budget        BigInt?
+  revenue       BigInt?
+  boxOfficeRank Int?
+}
+
+model Series {
+  id            String   @id @default(uuid())
+  contentId     String   @unique
+  content       Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  totalSeasons  Int      @default(1)
+  totalEpisodes Int      @default(1)
+  network       String?
+  seasons       Season[]
+}
+
+model Anime {
+  id             String    @id @default(uuid())
+  contentId      String    @unique
+  content        Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  romajiTitle    String?
+  nativeTitle    String?
+  seasonYear     Int?
+  seasonPeriod   String?   // WINTER, SPRING, SUMMER, FALL
+  episodesCount  Int?
+  airingSchedule String?
+  nextAiringDate DateTime?
+  format         String?   // TV, TV_SHORT, MOVIE, OVA, ONA, SPECIAL
+  studio         String?
+  sourceMaterial String?   // MANGA, LIGHT_NOVEL, ORIGINAL
+}
+
+model Season {
+  id            String               @id @default(uuid())
+  seriesId      String
+  series        Series               @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seasonNumber  Int
+  title         String
+  synopsis      String?              @db.Text
+  posterUrl     String?
+  airDate       DateTime?
+  episodeCount  Int                  @default(0)
+  episodes      Episode[]
+  localizations SeasonLocalization[]
+
+  @@unique([seriesId, seasonNumber])
+  @@index([seriesId])
+}
+
+model SeasonLocalization {
+  id           String   @id @default(uuid())
+  seasonId     String
+  season       Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  languageCode String
+  language     Language @relation(fields: [languageCode], references: [code])
+  title        String
+  synopsis     String?  @db.Text
+
+  @@unique([seasonId, languageCode])
+  @@index([languageCode])
+}
+
+model Episode {
+  id             String                @id @default(uuid())
+  seasonId       String
+  season         Season                @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  episodeNumber  Int
+  title          String
+  synopsis       String?               @db.Text
+  duration       Int?                  // duration in minutes
+  thumbnailUrl   String?
+  videoUrl       String?
+  airDate        DateTime?
+  localizations  EpisodeLocalization[]
+  audioTracks    AudioTrack[]
+  subtitleTracks SubtitleTrack[]
+
+  @@unique([seasonId, episodeNumber])
+  @@index([seasonId])
+}
+
+model EpisodeLocalization {
+  id           String   @id @default(uuid())
+  episodeId    String
+  episode      Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  languageCode String
+  language     Language @relation(fields: [languageCode], references: [code])
+  title        String
+  synopsis     String?  @db.Text
+
+  @@unique([episodeId, languageCode])
+  @@index([languageCode])
+}
+
+// ==============================================================================
+// VERIFIED AUDIO & SUBTITLE AVAILABILITY (STRICTLY SEPARATED)
+// ==============================================================================
+
+model AudioTrack {
+  id                 String             @id @default(uuid())
+  contentId          String
+  content            Content            @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  episodeId          String?
+  episode            Episode?           @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  languageCode       String
+  language           Language           @relation(fields: [languageCode], references: [code])
+  locale             String             @default("") // e.g., "hi-IN", "es-419", "es-ES", "pt-BR"
+  audioType          AudioType          @default(DUBBED)
+  audioFormat        String?            // e.g., "Dolby Atmos", "5.1", "Stereo"
+  availabilityStatus AvailabilityStatus @default(UNVERIFIED)
+  verificationSource VerificationSource @default(UNSPECIFIED)
+  providerName       String             @default("")
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([contentId, episodeId, languageCode, locale, audioType, providerName])
+  @@index([languageCode, availabilityStatus, audioType])
+  @@index([contentId, availabilityStatus])
+  @@index([availabilityStatus])
+}
+
+model SubtitleTrack {
+  id                 String             @id @default(uuid())
+  contentId          String
+  content            Content            @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  episodeId          String?
+  episode            Episode?           @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  languageCode       String
+  language           Language           @relation(fields: [languageCode], references: [code])
+  locale             String             @default("") // e.g., "en-US", "zh-Hans", "zh-Hant", "pt-BR"
+  subtitleType       SubtitleType       @default(STANDARD)
+  availabilityStatus AvailabilityStatus @default(UNVERIFIED)
+  verificationSource VerificationSource @default(UNSPECIFIED)
+  providerName       String             @default("")
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([contentId, episodeId, languageCode, locale, subtitleType, providerName])
+  @@index([languageCode, availabilityStatus, subtitleType])
+  @@index([contentId, availabilityStatus])
+  @@index([availabilityStatus])
+}
+
+// ==============================================================================
+// GENRES, COMPANIES, PEOPLE, TRAILERS, EXTERNAL IDS
+// ==============================================================================
+
+model Genre {
+  id            String              @id @default(uuid())
+  name          String              @unique
+  slug          String              @unique
+  tmdbGenreId   Int?                @unique
+  contents      ContentGenre[]
+  localizations GenreLocalization[]
+}
+
+model GenreLocalization {
+  id           String   @id @default(uuid())
+  genreId      String
+  genre        Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  languageCode String
+  language     Language @relation(fields: [languageCode], references: [code])
+  name         String
+
+  @@unique([genreId, languageCode])
+  @@index([languageCode])
+}
+
+model ContentGenre {
+  contentId String
+  genreId   String
+  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  genre     Genre   @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, genreId])
+  @@index([contentId])
+  @@index([genreId])
+}
+
+model ProductionCompany {
+  id            String                     @id @default(uuid())
+  name          String
+  slug          String                     @unique
+  tmdbCompanyId Int?                       @unique
+  logoUrl       String?
+  originCountry String?
+  contents      ContentProductionCompany[]
+
+  @@index([name])
+}
+
+model ContentProductionCompany {
+  contentId String
+  companyId String
+  content   Content           @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  company   ProductionCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, companyId])
+  @@index([contentId])
+  @@index([companyId])
+}
+
+model Person {
+  id             String    @id @default(uuid())
+  name           String
+  slug           String    @unique
+  tmdbPersonId   Int?      @unique
+  anilistStaffId Int?      @unique
+  biography      String?   @db.Text
+  avatarUrl      String?
+  birthDate      DateTime?
+  castRoles      Cast[]
+
+  @@index([name])
+}
+
+model Cast {
+  id        String     @id @default(uuid())
+  contentId String
+  personId  String
+  character String?
+  role      PersonRole @default(ACTOR)
+  order     Int        @default(0)
+  content   Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  person    Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, personId, role])
+  @@index([contentId])
+  @@index([personId])
+  @@index([role])
+}
+
+model Trailer {
+  id           String      @id @default(uuid())
+  contentId    String
+  content      Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  languageCode String      @default("en")
+  language     Language    @relation(fields: [languageCode], references: [code])
+  countryCode  String?
+  site         String      @default("YouTube")
+  videoKey     String
+  name         String
+  trailerType  TrailerType @default(TRAILER)
+  isOfficial   Boolean     @default(true)
+  publishedAt  DateTime?
+
+  @@unique([contentId, site, videoKey])
+  @@index([contentId])
+}
+
+model ExternalSource {
+  id           String             @id @default(uuid())
+  contentId    String
+  content      Content            @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  source       ExternalSourceType
+  externalId   String
+  externalUrl  String?
+  lastSyncedAt DateTime           @default(now())
+  metadataJson Json?
+
+  @@unique([source, externalId])
+  @@index([contentId])
+  @@index([source, externalId])
+}
+
+// ==============================================================================
+// REGIONAL CERTIFICATIONS, AVAILABILITY & USER PREFERENCES
+// ==============================================================================
+
+model RegionalCertification {
+  id            String     @id @default(uuid())
+  contentId     String
+  content       Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  countryCode   String
+  country       Country    @relation(fields: [countryCode], references: [code])
+  certification String     // e.g., "U/A 16+", "PG-13", "FSK 12", "15"
+  safetyTier    SafetyTier @default(GENERAL_MATURE)
+  releaseDate   DateTime?
+
+  @@unique([contentId, countryCode])
+  @@index([countryCode])
+  @@index([safetyTier])
+}
+
+model RegionalAvailability {
+  id                 String             @id @default(uuid())
+  contentId          String
+  content            Content            @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  countryCode        String
+  country            Country            @relation(fields: [countryCode], references: [code])
+  providerId         String             // e.g., TMDB watch provider ID or "cinova-direct"
+  providerName       String
+  providerLogoUrl    String?
+  monetizationType   MonetizationType   @default(SUBSCRIPTION)
+  authorizedUrl      String?
+  availableFrom      DateTime?
+  availableUntil     DateTime?
+  availabilityStatus AvailabilityStatus @default(UNVERIFIED)
+  verifiedAt         DateTime?
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([contentId, countryCode, providerId, monetizationType])
+  @@index([countryCode, availabilityStatus])
+  @@index([contentId, countryCode])
+  @@index([monetizationType])
+}
+
+model UserPreference {
+  userId                        String     @id
+  countryCode                   String?
+  country                       Country?   @relation(fields: [countryCode], references: [code])
+  uiLanguageCode                String?
+  preferredAudioLanguageCode    String?
+  secondaryAudioLanguageCode    String?
+  preferredSubtitleLanguageCode String?
+  preferClosedCaptions          Boolean    @default(false)
+  safetyLevel                   SafetyTier @default(GENERAL_MATURE)
+  updatedAt                     DateTime   @updatedAt
+}
+
+// ==============================================================================
+// PERSISTENT, RESUMABLE SYNCHRONIZATION JOBS & FAILURE LOGS
+// ==============================================================================
+
+model SyncJob {
+  id             String        @id @default(uuid())
+  jobKey         String        @unique // e.g., "tmdb:trending:movies", "anilist:airing"
+  source         String        // "TMDB", "ANILIST"
+  category       String        // "popular", "trending", "top_rated", "upcoming", "airing", "international"
+  status         SyncStatus    @default(IDLE)
+  cursorPage     Int           @default(1)
+  maxPagesPerRun Int           @default(2)
+  cursorMeta     Json?         // e.g., { year: 2024, country: "IN", lastDeltaDate: "2026-11-18" }
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  itemsProcessed Int           @default(0)
+  itemsCreated   Int           @default(0)
+  itemsUpdated   Int           @default(0)
+  itemsFailed    Int           @default(0)
+  lastError      String?       @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  failures       SyncFailure[]
+
+  @@index([status])
+  @@index([source, category])
+  @@index([lockedAt])
+}
+
+model SyncFailure {
+  id           String    @id @default(uuid())
+  syncJobId    String?
+  syncJob      SyncJob?  @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+  source       String
+  externalId   String
+  entityType   String    // "MOVIE", "SERIES", "ANIME"
+  errorMessage String    @db.Text
+  retryCount   Int       @default(0)
+  maxRetries   Int       @default(5)
+  nextRetryAt  DateTime?
+  resolvedAt   DateTime?
+  payloadJson  Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([resolvedAt, nextRetryAt])
+  @@index([source, externalId])
+}
+
+model SyncHistory {
+  id             String     @id @default(uuid())
+  source         String     // "TMDB", "ANILIST", "ALL"
+  status         SyncStatus @default(RUNNING)
+  itemsProcessed Int        @default(0)
+  itemsCreated   Int        @default(0)
+  itemsUpdated   Int        @default(0)
+  itemsFailed    Int        @default(0)
+  errorsJson     Json?
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+  triggeredBy    String     @default("CRON") // "CRON", "MANUAL", "WEBHOOK"
+
+  @@index([startedAt])
+  @@index([status])
+}
