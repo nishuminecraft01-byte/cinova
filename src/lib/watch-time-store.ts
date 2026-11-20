@@ -1,6 +1,4 @@
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import {
   FREE_DAILY_WATCH_LIMIT_SECONDS,
   MembershipTier,
@@ -39,8 +37,6 @@ export interface WatchTimeSnapshot {
 
 type StoreFileShape = Record<string, WatchTimeRecord>;
 
-const DATA_DIR = path.join(process.cwd(), ".cinova-data");
-const STORE_PATH = path.join(DATA_DIR, "watch-time.json");
 const MAX_SINGLE_HEARTBEAT_SECONDS = 30;
 
 declare global {
@@ -60,45 +56,11 @@ function getCache(): Map<string, WatchTimeRecord> {
   if (!globalThis.__cinovaWatchTimeCache) {
     globalThis.__cinovaWatchTimeCache = new Map<string, WatchTimeRecord>();
   }
-  if (!globalThis.__cinovaWatchTimeLoaded) {
-    globalThis.__cinovaWatchTimeLoaded = true;
-    try {
-      if (fs.existsSync(STORE_PATH)) {
-        const raw = fs.readFileSync(STORE_PATH, "utf8");
-        const parsed = JSON.parse(raw) as StoreFileShape;
-        const todayIst = getIstDateKey();
-        for (const [k, rec] of Object.entries(parsed)) {
-          if (rec && rec.dateIst === todayIst && typeof rec.usedSeconds === "number") {
-            globalThis.__cinovaWatchTimeCache.set(k, rec);
-          }
-        }
-      }
-    } catch {
-      // Safe fallback to empty cache if file is missing or unreadable
-    }
-  }
   return globalThis.__cinovaWatchTimeCache;
 }
 
-function persistCacheToDisk(cache: Map<string, WatchTimeRecord>): void {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const todayIst = getIstDateKey();
-    const out: StoreFileShape = {};
-    for (const [k, rec] of Array.from(cache.entries())) {
-      // Prune expired IST days automatically on write
-      if (rec.dateIst === todayIst) {
-        out[k] = rec;
-      }
-    }
-    const tmpPath = `${STORE_PATH}.${process.pid}.tmp`;
-    fs.writeFileSync(tmpPath, JSON.stringify(out, null, 2), "utf8");
-    fs.renameSync(tmpPath, STORE_PATH);
-  } catch {
-    // Non-fatal in read-only serverless runtimes; in-memory + DB still operate
-  }
+function persistCacheToDisk(_cache: Map<string, WatchTimeRecord>): void {
+  // Edge runtime memory cache is active; persistent disk writes safely bypassed
 }
 
 async function ensureDbTable(): Promise<boolean> {

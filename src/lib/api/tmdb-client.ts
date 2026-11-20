@@ -9,8 +9,6 @@
  * `append_to_response` is used, while Node `https.get` succeeds reliably.
  */
 
-import * as https from "https";
-import * as zlib from "zlib";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { getSyncAvailability } from "@/lib/video-sources";
 import {
@@ -27,14 +25,7 @@ import {
   mapGenreIdForMediaType,
 } from "@/lib/tmdb-worldwide";
 
-/**
- * Dedicated HTTP/HTTPS Agent for TMDB API calls.
- * Uses fresh connections without stale keep-alive sockets to avoid Cloudflare edge ECONNRESET.
- */
-const tmdbHttpsAgent = new https.Agent({
-  keepAlive: false,
-  timeout: 15000,
-});
+
 
 export class TMDBConfigError extends Error {
   public readonly code = "TMDB_NOT_CONFIGURED";
@@ -626,103 +617,37 @@ export class TMDBClient {
   }
 
   /**
-   * Low-level HTTP GET using Node.js `https` module with persistent keep-alive agent.
-   * Returns parsed JSON. Decompresses gzip/deflate/br if needed.
-   * Throws TMDBConfigError, TMDBNotFoundError, or a generic Error on failure.
+   * Low-level HTTP GET using standard fetch.
+   * Returns parsed JSON. Compatible with Edge runtime and Node.js.
    */
-  private httpsGet<T>(urlStr: string, reqHeaders: Record<string, string>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const parsed = new URL(urlStr);
-      const options: https.RequestOptions = {
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        agent: tmdbHttpsAgent,
-        headers: {
-          ...reqHeaders,
-          "Accept-Encoding": "gzip, deflate, br",
-        },
-        timeout: 30000,
-      };
-
-      const req = https.get(options, (res) => {
-        // Handle redirects
-        if (
-          res.statusCode &&
-          res.statusCode >= 300 &&
-          res.statusCode < 400 &&
-          res.headers.location
-        ) {
-          this.httpsGet<T>(res.headers.location, reqHeaders).then(resolve).catch(reject);
-          return;
-        }
-
-        const statusCode = res.statusCode || 0;
-        const encoding = res.headers["content-encoding"] || "";
-
-        const chunks: Buffer[] = [];
-
-        const onData = (chunk: Buffer) => chunks.push(chunk);
-        const onEnd = () => {
-          const rawBuf = Buffer.concat(chunks);
-          const decode = (): Promise<string> => {
-            return new Promise((res2, rej2) => {
-              if (encoding === "br") {
-                zlib.brotliDecompress(rawBuf, (e, b) => (e ? rej2(e) : res2(b.toString("utf8"))));
-              } else if (encoding === "gzip" || encoding === "deflate") {
-                zlib.gunzip(rawBuf, (e, b) => {
-                  if (e) {
-                    // try inflate
-                    zlib.inflate(rawBuf, (e2, b2) => (e2 ? rej2(e) : res2(b2.toString("utf8"))));
-                  } else {
-                    res2(b.toString("utf8"));
-                  }
-                });
-              } else {
-                res2(rawBuf.toString("utf8"));
-              }
-            });
-          };
-
-          decode()
-            .then((text) => {
-              let parsed: T;
-              try {
-                parsed = JSON.parse(text) as T;
-              } catch {
-                reject(new Error(`TMDB returned non-JSON response (HTTP ${statusCode})`));
-                return;
-              }
-              if (statusCode === 401) {
-                reject(
-                  new TMDBConfigError(
-                    "TMDB credentials were rejected (HTTP 401). Please check your token/API key in .env.local."
-                  )
-                );
-              } else if (statusCode === 404) {
-                reject(new TMDBNotFoundError(`TMDB resource not found.`));
-              } else if (statusCode === 429) {
-                reject(new Error(`TMDB rate limit hit (HTTP 429).`));
-              } else if (statusCode >= 400) {
-                reject(new Error(`TMDB HTTP error ${statusCode}`));
-              } else {
-                resolve(parsed);
-              }
-            })
-            .catch(reject);
-        };
-
-        res.on("data", onData);
-        res.on("end", onEnd);
-        res.on("error", reject);
-      });
-
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("TMDB request timed out after 30s"));
-      });
-      req.on("error", reject);
+  private async httpsGet<T>(urlStr: string, reqHeaders: Record<string, string>): Promise<T> {
+    const res = await fetch(urlStr, {
+      method: "GET",
+      headers: {
+        ...reqHeaders,
+        "Accept": "application/json",
+      },
+      redirect: "follow",
     });
+
+    const statusCode = res.status;
+    if (statusCode === 401) {
+      throw new TMDBConfigError(
+        "TMDB credentials were rejected (HTTP 401). Please check your token/API key in .env.local."
+      );
+    } else if (statusCode === 404) {
+      throw new TMDBNotFoundError("TMDB resource not found.");
+    } else if (statusCode === 429) {
+      throw new Error("TMDB rate limit hit (HTTP 429).");
+    } else if (statusCode >= 400) {
+      throw new Error(`TMDB HTTP error ${statusCode}`);
+    }
+
+    try {
+      return (await res.json()) as T;
+    } catch {
+      throw new Error(`TMDB returned non-JSON response (HTTP ${statusCode})`);
+    }
   }
 
   private async fetchWithRetry<T>(
