@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CINOVA</string>
+    <string name="title_activity_main">CINOVA</string>
+    <string name="package_name">com.cinova.app</string>
+    <string name="custom_url_scheme">com.cinova.app</string>
+</resources>
