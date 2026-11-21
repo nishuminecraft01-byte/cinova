@@ -42,7 +42,21 @@ jobs:
       - name: Build Android Release and Debug APKs
         working-directory: ./android
         run: |
-          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+
+      - name: Print Gradle Error on Failure
+        if: failure()
+        run: |
+          echo "=== GRADLE FAILURE LOG (LAST 150 LINES) ==="
+          tail -n 150 gradle-build.log
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: gradle-build.log
 
       - name: Locate and Sign Release APK for Direct Installation
         run: |
