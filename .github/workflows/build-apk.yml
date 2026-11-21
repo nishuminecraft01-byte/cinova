@@ -1,0 +1,89 @@
+name: Build CINOVA Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x android/gradlew
+
+      - name: Build Android Release and Debug APKs
+        working-directory: ./android
+        run: |
+          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
+
+      - name: Sign Release APK for Direct Installation
+        run: |
+          mkdir -p apk-output
+          
+          # Locate apksigner in the preinstalled Android SDK build-tools
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          echo "Using apksigner: $APKSIGNER"
+
+          # Generate an ephemeral CI signing keystore
+          keytool -genkeypair -v \
+            -keystore ci-release.keystore \
+            -alias cinova \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass cinova123 \
+            -keypass cinova123 \
+            -dname "CN=CINOVA, OU=Mobile, O=CINOVA OTT, L=Mumbai, ST=MH, C=IN"
+
+          # Sign release APK with Android v2 + v3 signature schemes
+          $APKSIGNER sign \
+            --ks ci-release.keystore \
+            --ks-key-alias cinova \
+            --ks-pass pass:cinova123 \
+            --key-pass pass:cinova123 \
+            --out apk-output/CINOVA-v1.0-release.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+          # Copy raw unsigned release APK and debug APK
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk apk-output/CINOVA-v1.0-unsigned.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/CINOVA-v1.0-debug.apk
+
+          # Verify signatures
+          echo "=== Verifying signed release APK ==="
+          $APKSIGNER verify --verbose apk-output/CINOVA-v1.0-release.apk
+
+          echo "=== Generated APK Files ==="
+          ls -lh apk-output/
+
+      - name: Upload APKs as GitHub Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CINOVA-Android-APK
+          path: apk-output/*.apk
+          retention-days: 30
