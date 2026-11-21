@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { resolveStreamingServers } from "@/lib/streaming-servers";
-import { getPrimaryVideoSource } from "@/lib/video-sources";
+import { getPrimaryVideoSource, isTvSeries } from "@/lib/video-sources";
 import { getWatchTimeStatus, sanitizeViewerKey } from "@/lib/watch-time-store";
 import { signPlaybackToken } from "@/lib/playback-token";
 import { getServerAuthSession, setAuthSessionCookies } from "@/lib/supabase-server";
@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
       movieId?: string;
       season?: number;
       episode?: number;
+      isTv?: boolean;
+      mediaType?: string;
     };
 
     const movieId = (body.movieId || "").trim();
@@ -89,9 +91,13 @@ export async function POST(request: NextRequest) {
     const movie = findAuthorizedCatalogMovie(movieId);
     const season = Number(body.season) > 0 ? Number(body.season) : 1;
     const episode = Number(body.episode) > 0 ? Number(body.episode) : 1;
+    const isTv =
+      typeof body.isTv === "boolean"
+        ? body.isTv
+        : body.mediaType === "tv" || isTvSeries(movieId, movie);
 
     // 3. Resolve stream servers from Centralized Video Source Store and catalog
-    const rawServers = await resolveStreamingServers(movieId, movie, season, episode);
+    const rawServers = await resolveStreamingServers(movieId, movie, season, episode, isTv);
     const primarySource = await getPrimaryVideoSource(movieId);
 
     if (rawServers.length === 0) {

@@ -241,6 +241,20 @@ function SignUpPageContent() {
             </div>
           )}
 
+          {errorCode === "RATE_LIMIT_EXCEEDED" && (
+            <div className="pt-1.5 pl-6 space-y-1.5">
+              <p className="text-[11px] text-[#CBD5E1]">
+                If your account is already created, you can sign in directly:
+              </p>
+              <Link
+                href={nextPath !== "/" ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#FF385B] hover:text-[#F5F1F3] hover:underline"
+              >
+                Go to Sign In &rarr;
+              </Link>
+            </div>
+          )}
+
           {cooldownSeconds > 0 && (
             <div className="pl-6 text-[11px] text-[#AAA0A7]">
               Cooldown active: You can retry in{" "}

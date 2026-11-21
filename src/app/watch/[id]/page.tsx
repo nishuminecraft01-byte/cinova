@@ -160,18 +160,50 @@ function WatchPlayerContent() {
           type: isTvType ? ("series" as const) : (movie?.type || "movie"),
           seasons:
             tmdbDetail.seasons && tmdbDetail.seasons.length > 0
-              ? tmdbDetail.seasons.map((s) => ({
-                  seasonNumber: s.seasonNumber,
-                  title: s.title || `Season ${s.seasonNumber}`,
-                  episodes: s.episodes.map((ep) => ({
-                    episodeNumber: ep.episodeNumber,
-                    title: ep.title || `Episode ${ep.episodeNumber}`,
-                    description: ep.description || `Season ${s.seasonNumber}, Episode ${ep.episodeNumber}`,
-                    duration: ep.duration || 45,
-                    thumbnailUrl: tmdbDetail.backdropUrl || tmdbDetail.posterUrl || "",
-                    videoUrl: "",
-                  })),
-                }))
+              ? tmdbDetail.seasons.map((s) => {
+                  const sAny = s as {
+                    seasonNumber: number;
+                    title?: string;
+                    name?: string;
+                    episodeCount?: number;
+                    episodes?: Array<{
+                      episodeNumber: number;
+                      title: string;
+                      duration?: number;
+                      description?: string;
+                    }>;
+                  };
+                  const epCount = Math.max(
+                    1,
+                    sAny.episodeCount || (Array.isArray(sAny.episodes) ? sAny.episodes.length : 0) || 10
+                  );
+                  const epList =
+                    Array.isArray(sAny.episodes) && sAny.episodes.length > 0
+                      ? sAny.episodes.map((ep) => ({
+                          episodeNumber: ep.episodeNumber,
+                          title: ep.title || `Episode ${ep.episodeNumber}`,
+                          description:
+                            ep.description ||
+                            `Season ${sAny.seasonNumber}, Episode ${ep.episodeNumber}`,
+                          duration: ep.duration || 45,
+                          thumbnailUrl: tmdbDetail.backdropUrl || tmdbDetail.posterUrl || "",
+                          videoUrl: "",
+                        }))
+                      : Array.from({ length: epCount }, (_, epIdx) => ({
+                          episodeNumber: epIdx + 1,
+                          title: `Episode ${epIdx + 1}`,
+                          description: `Season ${sAny.seasonNumber}, Episode ${epIdx + 1}`,
+                          duration: 45,
+                          thumbnailUrl: tmdbDetail.backdropUrl || tmdbDetail.posterUrl || "",
+                          videoUrl: "",
+                        }));
+
+                  return {
+                    seasonNumber: sAny.seasonNumber,
+                    title: sAny.title || sAny.name || `Season ${sAny.seasonNumber}`,
+                    episodes: epList,
+                  };
+                })
               : tmdbDetail.numberOfSeasons
               ? Array.from({ length: tmdbDetail.numberOfSeasons }, (_, sIdx) => {
                   const epCount = Math.min(
@@ -193,7 +225,29 @@ function WatchPlayerContent() {
                     })),
                   };
                 })
-              : movie?.seasons,
+              : movie?.seasons ||
+                (movie?.totalSeasons
+                  ? Array.from({ length: movie.totalSeasons }, (_, sIdx) => {
+                      const epCount = Math.min(
+                        24,
+                        movie.totalEpisodes
+                          ? Math.ceil(movie.totalEpisodes / (movie.totalSeasons || 1))
+                          : 10
+                      );
+                      return {
+                        seasonNumber: sIdx + 1,
+                        title: `Season ${sIdx + 1}`,
+                        episodes: Array.from({ length: epCount }, (_, epIdx) => ({
+                          episodeNumber: epIdx + 1,
+                          title: `Episode ${epIdx + 1}`,
+                          duration: 45,
+                          description: `Season ${sIdx + 1}, Episode ${epIdx + 1}`,
+                          thumbnailUrl: movie.backdropUrl || movie.posterUrl || "",
+                          videoUrl: "",
+                        })),
+                      };
+                    })
+                  : undefined),
         }
       : {}),
   };
@@ -373,6 +427,8 @@ function WatchPlayerContent() {
         movieId: movie?.id || movieId,
         season: currentSeason,
         episode: currentEpisode,
+        isTv: isTvType,
+        mediaType: isTvType ? "tv" : "movie",
       }),
     })
       .then(async (res) => {
@@ -420,7 +476,7 @@ function WatchPlayerContent() {
     return () => {
       cancelled = true;
     };
-  }, [movieId, movie, currentSeason, currentEpisode, user, authSessionLoading, applyQuotaUpdate]);
+  }, [movieId, movie, currentSeason, currentEpisode, isTvType, user, authSessionLoading, applyQuotaUpdate]);
 
   // Active server object (only ever uses server-authorized stream URLs)
   const activeServer: StreamingServer | null =
@@ -724,10 +780,23 @@ function WatchPlayerContent() {
     setIframeKey((prev) => prev + 1);
   };
 
-  // Change episode
+  // Change episode with complete player and state cleanup
   const handleSelectEpisode = (seasonNum: number, episodeNum: number) => {
     setCurrentSeason(seasonNum);
     setCurrentEpisode(episodeNum);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    setIsPlaying(false);
+    setBuffering(false);
+    setCurrentTime(0);
+    setStreamError(null);
+    setEmbedPaused(false);
     router.push(`/watch/${movieId}?season=${seasonNum}&ep=${episodeNum}`);
     setIframeKey((prev) => prev + 1);
   };
@@ -1517,8 +1586,9 @@ function WatchPlayerContent() {
                 src={activeServer.url}
                 title={`${resolvedMovie.title} - ${activeServer.name}`}
                 className="w-full h-full border-0 absolute inset-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 allowFullScreen
+                referrerPolicy="origin"
               />
             </div>
           )}
@@ -1620,7 +1690,7 @@ function WatchPlayerContent() {
               {/* Season Selector Tabs */}
               {resolvedMovie?.seasons && resolvedMovie.seasons.length > 1 && (
                 <div className="flex items-center gap-1 bg-[#10080C] p-1 rounded-lg border border-[rgba(155,25,57,0.24)]">
-                  {resolvedMovie.seasons.map((s) => (
+                  {(resolvedMovie.seasons || []).map((s) => (
                     <button
                       key={s.seasonNumber}
                       onClick={() => handleSelectEpisode(s.seasonNumber, 1)}
@@ -1639,7 +1709,7 @@ function WatchPlayerContent() {
 
             {/* Episode Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {activeSeasonData?.episodes.map((ep) => {
+              {(activeSeasonData?.episodes || []).map((ep) => {
                 const isEpActive = currentEpisode === ep.episodeNumber;
                 return (
                   <button

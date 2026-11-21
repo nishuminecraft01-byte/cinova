@@ -89,12 +89,36 @@ function buildTmdbStreamingCluster(
     },
     {
       id: "videasy",
-      name: "Videasy • Hindi Server",
+      name: "Videasy • Hindi / Multi",
       provider: "videasy",
       badge: "Hindi",
       quality: "1080p FHD",
       type: "embed",
-      url: `https://videasy.xyz/embed/movie/${encodeURIComponent(tmdbId)}?lang=hi&autoplay=false`,
+      url: isTv
+        ? `https://player.videasy.net/tv/${encodeURIComponent(tmdbId)}/${s}/${ep}`
+        : `https://player.videasy.net/movie/${encodeURIComponent(tmdbId)}`,
+    },
+    {
+      id: "vidsrc",
+      name: "VidSource • Fast Cloud",
+      provider: "vidsrc",
+      badge: "Fast Cloud",
+      quality: "1080p FHD",
+      type: "embed",
+      url: isTv
+        ? `https://vidsrc.to/embed/tv/${encodeURIComponent(tmdbId)}/${s}/${ep}`
+        : `https://vidsrc.to/embed/movie/${encodeURIComponent(tmdbId)}`,
+    },
+    {
+      id: "autoembed",
+      name: "AutoStream • Global Edge",
+      provider: "autoembed",
+      badge: "Edge",
+      quality: "1080p FHD",
+      type: "embed",
+      url: isTv
+        ? `https://autoembed.co/tv/tmdb/${encodeURIComponent(tmdbId)}-${s}-${ep}`
+        : `https://autoembed.co/movie/tmdb/${encodeURIComponent(tmdbId)}`,
     },
   ];
 
@@ -110,7 +134,8 @@ export async function resolveStreamingServers(
   movieId: string,
   movie?: Movie | null,
   _season: number = 1,
-  _episode: number = 1
+  _episode: number = 1,
+  _isTvOverride?: boolean
 ): Promise<StreamingServer[]> {
   const servers: StreamingServer[] = [];
   const seenUrls = new Set<string>();
@@ -152,7 +177,7 @@ export async function resolveStreamingServers(
   // 3. Multi-server streaming redundancy cluster for TMDB titles
   const tmdbId = resolveTmdbId(movieId, movie);
   if (tmdbId) {
-    const isTv = isTvSeries(movieId, movie);
+    const isTv = typeof _isTvOverride === "boolean" ? _isTvOverride : isTvSeries(movieId, movie);
     const cluster = buildTmdbStreamingCluster(tmdbId, isTv, _season, _episode);
     for (const srv of cluster) {
       if (!seenUrls.has(srv.url)) {
