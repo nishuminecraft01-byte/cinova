@@ -9,6 +9,7 @@ import {
   Tv,
   Sparkles,
   Bookmark,
+  History,
   User,
   Settings,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { watchlist } = useWatchlist();
+  const { watchlist, continueWatching } = useWatchlist();
   const { user } = useAuth();
   const [queryType, setQueryType] = useState<string | null>(null);
   const [tabParam, setTabParam] = useState<string | null>(null);
@@ -46,8 +47,15 @@ export default function Sidebar() {
       label: "My List",
       href: "/profile?tab=watchlist",
       icon: Bookmark,
-      active: pathname === "/profile" && tabParam !== "account" && tabParam !== "settings",
+      active: pathname === "/profile" && tabParam !== "account" && tabParam !== "settings" && tabParam !== "history" && tabParam !== "continue",
       badge: watchlist.length > 0 ? watchlist.length : undefined,
+    },
+    {
+      label: "History",
+      href: "/history",
+      icon: History,
+      active: pathname === "/history" || (pathname === "/profile" && (tabParam === "history" || tabParam === "continue")),
+      badge: continueWatching.length > 0 ? continueWatching.length : undefined,
     },
     {
       label: "Profile",

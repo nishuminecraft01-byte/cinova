@@ -21,6 +21,7 @@ import {
   CreditCard,
   ChevronDown,
   Crown,
+  History,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useWatchlist } from "@/context/WatchlistContext";
@@ -36,7 +37,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { watchlist } = useWatchlist();
+  const { watchlist, continueWatching } = useWatchlist();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isAnimeQuery, setIsAnimeQuery] = useState(false);
@@ -328,6 +329,19 @@ export default function Navbar() {
                           </span>
                         )}
                       </Link>
+                      <Link
+                        href="/history"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[#AAA0A7] hover:text-[#F5F1F3] hover:bg-[#160B10] transition-colors"
+                      >
+                        <History className="w-4 h-4 text-[#FF385B]" />
+                        <span>Watch History</span>
+                        {continueWatching.length > 0 && (
+                          <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] bg-[#650A20]/60 text-[#F5F1F3] font-semibold">
+                            {continueWatching.length}
+                          </span>
+                        )}
+                      </Link>
                       {user.role === "admin" && (
                         <Link
                           href="/admin"
@@ -515,6 +529,22 @@ export default function Navbar() {
                 {watchlist.length > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-xs bg-[#650A20]/70 text-[#F5F1F3]">
                     {watchlist.length}
+                  </span>
+                )}
+              </Link>
+
+              <Link
+                href="/history"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-between min-h-[44px] px-3.5 py-2.5 rounded-xl text-[#AAA0A7] hover:text-[#F5F1F3] hover:bg-[#160B10] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <History className="w-4 h-4" />
+                  <span>Watch History</span>
+                </div>
+                {continueWatching.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-[#650A20]/70 text-[#F5F1F3]">
+                    {continueWatching.length}
                   </span>
                 )}
               </Link>

@@ -30,11 +30,22 @@ import {
 function ProfileContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { watchlist, removeFromWatchlist, continueWatching, getMovieById } = useWatchlist();
+  const {
+    watchlist,
+    removeFromWatchlist,
+    continueWatching,
+    removeFromHistory,
+    clearHistory,
+    getMovieById,
+  } = useWatchlist();
 
   const tabParam = searchParams?.get("tab");
   const [activeTab, setActiveTab] = useState<"watchlist" | "continue" | "settings">(
-    tabParam === "settings" ? "settings" : tabParam === "continue" ? "continue" : "watchlist"
+    tabParam === "settings"
+      ? "settings"
+      : tabParam === "continue" || tabParam === "history"
+      ? "continue"
+      : "watchlist"
   );
   const [preferredQuality, setPreferredQuality] = useState("720p (HD)");
   const [preferSubtitles, setPreferSubtitles] = useState(true);
@@ -64,7 +75,7 @@ function ProfileContent() {
 
   useEffect(() => {
     if (tabParam === "settings") setActiveTab("settings");
-    else if (tabParam === "continue") setActiveTab("continue");
+    else if (tabParam === "continue" || tabParam === "history") setActiveTab("continue");
     else if (tabParam === "watchlist") setActiveTab("watchlist");
   }, [tabParam]);
 
@@ -320,48 +331,88 @@ function ProfileContent() {
               <p className="text-xs text-[#AAA0A7] max-w-sm mx-auto">
                 Start watching any title to pause and resume playback seamlessly.
               </p>
+              <Link
+                href="/history"
+                className="inline-block mt-3 px-5 py-2.5 rounded-full bg-[#160B10] hover:bg-[#1D0C13] border border-[rgba(155,25,57,0.28)] text-[#F5F1F3] font-semibold text-xs transition-all"
+              >
+                Open Watch History
+              </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {continueItems.map(({ movie, progressSeconds, durationSeconds }) => {
-                const pct = Math.min(
-                  100,
-                  Math.round((progressSeconds / (durationSeconds || 1)) * 100)
-                );
-                return (
-                  <div
-                    key={movie.id}
-                    className="p-4 rounded-xl bg-[#160B10] border border-[rgba(155,25,57,0.22)] flex items-center gap-4 hover:border-[#E11D48]/55 transition-all"
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs text-[#AAA0A7]">
+                  Showing {continueItems.length} active sessions
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => clearHistory()}
+                    className="text-xs text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1.5"
                   >
-                    <div className="w-24 aspect-video rounded-lg overflow-hidden bg-[#080506] flex-shrink-0 relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={movie.backdropUrl || movie.posterUrl}
-                        alt={movie.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                        <Link
-                          href={`/watch/${movie.id}`}
-                          className="w-7 h-7 rounded-full bg-[#E11D48] flex items-center justify-center text-[#F5F1F3]"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-[#F5F1F3] ml-0.5" />
-                        </Link>
-                      </div>
-                    </div>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear All</span>
+                  </button>
+                  <Link
+                    href="/history"
+                    className="text-xs text-[#FF385B] hover:text-[#F5F1F3] font-semibold transition-colors"
+                  >
+                    View Dedicated History Page &rarr;
+                  </Link>
+                </div>
+              </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-bold text-[#F5F1F3] truncate">{movie.title}</h4>
-                      <p className="text-xs text-[#AAA0A7] mt-0.5">
-                        {Math.floor(progressSeconds / 60)}m watched ({pct}%)
-                      </p>
-                      <div className="w-full bg-[#080506] h-1.5 rounded-full overflow-hidden mt-2">
-                        <div className="bg-[#E11D48] h-full" style={{ width: `${pct}%` }} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {continueItems.map(({ movie, progressSeconds, durationSeconds }) => {
+                  const pct = Math.min(
+                    100,
+                    Math.round((progressSeconds / (durationSeconds || 1)) * 100)
+                  );
+                  return (
+                    <div
+                      key={movie.id}
+                      className="group/card relative p-4 rounded-xl bg-[#160B10] border border-[rgba(155,25,57,0.22)] flex items-center gap-4 hover:border-[#E11D48]/55 transition-all"
+                    >
+                      <div className="w-24 aspect-video rounded-lg overflow-hidden bg-[#080506] flex-shrink-0 relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={movie.backdropUrl || movie.posterUrl}
+                          alt={movie.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                          <Link
+                            href={`/watch/${movie.id}`}
+                            className="w-7 h-7 rounded-full bg-[#E11D48] flex items-center justify-center text-[#F5F1F3]"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-[#F5F1F3] ml-0.5" />
+                          </Link>
+                        </div>
                       </div>
+
+                      <div className="flex-1 min-w-0 pr-6">
+                        <h4 className="text-sm font-bold text-[#F5F1F3] truncate">{movie.title}</h4>
+                        <p className="text-xs text-[#AAA0A7] mt-0.5">
+                          {Math.floor(progressSeconds / 60)}m watched ({pct}%)
+                        </p>
+                        <div className="w-full bg-[#080506] h-1.5 rounded-full overflow-hidden mt-2">
+                          <div className="bg-[#E11D48] h-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFromHistory(movie.id)}
+                        title="Remove from history"
+                        aria-label={`Remove ${movie.title} from history`}
+                        className="absolute top-3 right-3 p-1.5 rounded-full bg-[#10080C] hover:bg-rose-600 text-[#AAA0A7] hover:text-white border border-transparent hover:border-rose-400 transition-all opacity-0 group-hover/card:opacity-100"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

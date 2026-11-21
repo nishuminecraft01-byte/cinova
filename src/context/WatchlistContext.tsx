@@ -15,6 +15,8 @@ interface WatchlistContextType {
   toggleWatchlist: (movieId: string) => void;
   isInWatchlist: (movieId: string) => boolean;
   updateProgress: (movieId: string, progressSeconds: number, durationSeconds: number) => void;
+  removeFromHistory: (movieId: string) => void;
+  clearHistory: () => void;
   getMovieById: (id: string) => Movie | undefined;
   addMovie: (movie: Movie) => void;
   updateMovie: (movieId: string, updates: Partial<Movie>) => void;
@@ -200,6 +202,19 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
       return updated;
     });
+  }, []);
+
+  const removeFromHistory = useCallback((movieId: string) => {
+    setContinueWatching((prev) => {
+      const updated = prev.filter((item) => item.movieId !== movieId);
+      localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const clearHistory = useCallback(() => {
+    setContinueWatching([]);
+    localStorage.removeItem("cinova_continue_watching");
   }, []);
 
   // Strict O(1) movie resolver: matches active state or verified TMDB catalog by exact id / tmdbId
@@ -436,6 +451,8 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       toggleWatchlist,
       isInWatchlist,
       updateProgress,
+      removeFromHistory,
+      clearHistory,
       getMovieById,
       addMovie,
       updateMovie,
@@ -455,6 +472,8 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       toggleWatchlist,
       isInWatchlist,
       updateProgress,
+      removeFromHistory,
+      clearHistory,
       getMovieById,
       addMovie,
       updateMovie,
