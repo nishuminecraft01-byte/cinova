@@ -31,6 +31,11 @@ jobs:
       - name: Install NPM Dependencies
         run: npm ci --include=dev
 
+      - name: Configure Java 17 Compatibility for Capacitor
+        run: |
+          find node_modules/@capacitor -name "*.gradle" -exec sed -i 's/VERSION_21/VERSION_17/g' {} + 2>/dev/null || true
+          echo "Patched Capacitor dependencies to Java 17"
+
       - name: Update Web Shell Assets
         run: |
           mkdir -p android/app/src/main/assets/public
@@ -39,24 +44,16 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x android/gradlew
 
-      - name: Build Android Release and Debug APKs
+      - name: Build Android Release APK
         working-directory: ./android
         run: |
-          set -o pipefail
-          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Print Gradle Error on Failure
         if: failure()
         run: |
-          echo "=== GRADLE FAILURE LOG (LAST 150 LINES) ==="
-          tail -n 150 gradle-build.log
-
-      - name: Upload Build Log on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-build-log
-          path: gradle-build.log
+          echo "=== GRADLE REPORT ERRORS ==="
+          find android/ -name "*.txt" -o -name "*.log" | xargs tail -n 50 2>/dev/null || true
 
       - name: Locate and Sign Release APK for Direct Installation
         run: |
@@ -66,11 +63,12 @@ jobs:
           find android/app/build/outputs/apk -type f -ls
 
           # Find release APK
-          RELEASE_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          DEBUG_APK=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          RELEASE_APK=$(find android/app/build/outputs/apk -name "*release*.apk" | head -n 1)
+          if [ -z "$RELEASE_APK" ]; then
+            RELEASE_APK=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
 
-          echo "Found Release APK: $RELEASE_APK"
-          echo "Found Debug APK: $DEBUG_APK"
+          echo "Found Target APK: $RELEASE_APK"
 
           if [ -z "$RELEASE_APK" ]; then
             echo "ERROR: No release APK found!"
