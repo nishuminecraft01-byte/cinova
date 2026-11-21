@@ -36,6 +36,26 @@ export async function POST(request: NextRequest) {
     }
 
     const now = Date.now();
+
+    // 1. Persistent cookie-based cooldown check
+    const cookieVal = request.cookies.get("cinova_cooldown_reset")?.value;
+    if (cookieVal) {
+      const expiry = parseInt(cookieVal, 10);
+      const remainingSeconds = !isNaN(expiry)
+        ? Math.max(1, Math.ceil((expiry - now) / 1000))
+        : 60;
+      return NextResponse.json(
+        {
+          success: false,
+          code: "RATE_LIMIT_EXCEEDED",
+          error: `Please wait ${remainingSeconds} seconds before requesting another password reset link.`,
+          retryAfterSeconds: remainingSeconds,
+        },
+        { status: 429, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    // 2. In-memory email-based cooldown check
     const lastSent = lastResetTimestamps.get(email);
     if (lastSent && now - lastSent < RESET_COOLDOWN_MS) {
       const remainingSeconds = Math.ceil((RESET_COOLDOWN_MS - (now - lastSent)) / 1000);
@@ -75,13 +95,22 @@ export async function POST(request: NextRequest) {
 
     lastResetTimestamps.set(email, now);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         message: "Password reset link sent! Please check your email inbox to reset your password.",
       },
       { headers: { "Cache-Control": "no-store" } }
     );
+
+    response.cookies.set("cinova_cooldown_reset", String(now + RESET_COOLDOWN_MS), {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60,
+    });
+
+    return response;
   } catch {
     return NextResponse.json(
       { success: false, error: "Unable to process password reset right now. Please try again later." },

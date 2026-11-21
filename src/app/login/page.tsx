@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle, Info, CheckCircle2, RotateCw, Send } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import AuthShell from "@/components/AuthShell";
+import {
+  getPersistentCooldown,
+  setPersistentCooldown,
+  clearPersistentCooldown,
+} from "@/lib/cooldown";
 
 function sanitizeNextPath(raw: string | null): string {
   if (!raw) return "/";
@@ -35,11 +40,28 @@ function LoginPageContent() {
   const [resetLoading, setResetLoading] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
+  // Restore persistent cooldown across reloads
+  useEffect(() => {
+    const saved = getPersistentCooldown("login");
+    if (saved > 0) {
+      setCooldownSeconds(saved);
+    }
+  }, []);
+
   // Active cooldown timer
   useEffect(() => {
-    if (cooldownSeconds <= 0) return;
+    if (cooldownSeconds <= 0) {
+      clearPersistentCooldown("login");
+      return;
+    }
     const timer = setInterval(() => {
-      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          clearPersistentCooldown("login");
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
@@ -62,6 +84,7 @@ function LoginPageContent() {
         setError(result.error || "Unable to sign in right now. Please try again.");
         if (result.retryAfterSeconds) {
           setCooldownSeconds(result.retryAfterSeconds);
+          setPersistentCooldown("login", result.retryAfterSeconds);
         }
         return;
       }
@@ -79,7 +102,12 @@ function LoginPageContent() {
   };
 
   const handleResendVerification = async () => {
-    if (!email.trim() || resendLoading || cooldownSeconds > 0) return;
+    const currentRemaining = getPersistentCooldown("login");
+    if (!email.trim() || resendLoading || currentRemaining > 0) {
+      if (currentRemaining > 0) setCooldownSeconds(currentRemaining);
+      return;
+    }
+
     setResendLoading(true);
     setError("");
     setInfoMsg("");
@@ -88,10 +116,12 @@ function LoginPageContent() {
       if (res.ok) {
         setInfoMsg(res.message || "Verification email sent. Please check your inbox and spam folder.");
         setCooldownSeconds(60);
+        setPersistentCooldown("login", 60);
       } else {
         setError(res.error || "Unable to resend verification email.");
         if (res.retryAfterSeconds) {
           setCooldownSeconds(res.retryAfterSeconds);
+          setPersistentCooldown("login", res.retryAfterSeconds);
         }
       }
     } catch {
@@ -102,12 +132,16 @@ function LoginPageContent() {
   };
 
   const handleResetPassword = async () => {
-    if (!email.trim() || resetLoading || cooldownSeconds > 0) {
+    const currentRemaining = getPersistentCooldown("login");
+    if (!email.trim() || resetLoading || currentRemaining > 0) {
       if (!email.trim()) {
         setError("Please enter your account email address above to reset your password.");
+      } else if (currentRemaining > 0) {
+        setCooldownSeconds(currentRemaining);
       }
       return;
     }
+
     setResetLoading(true);
     setError("");
     setInfoMsg("");
@@ -116,10 +150,12 @@ function LoginPageContent() {
       if (res.ok) {
         setInfoMsg(res.message || "Password reset link sent! Check your inbox.");
         setCooldownSeconds(60);
+        setPersistentCooldown("login", 60);
       } else {
         setError(res.error || "Unable to send password reset email.");
         if (res.retryAfterSeconds) {
           setCooldownSeconds(res.retryAfterSeconds);
+          setPersistentCooldown("login", res.retryAfterSeconds);
         }
       }
     } catch {

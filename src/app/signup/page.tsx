@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Info, Mail, RotateCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import AuthShell from "@/components/AuthShell";
+import {
+  getPersistentCooldown,
+  setPersistentCooldown,
+  clearPersistentCooldown,
+} from "@/lib/cooldown";
 
 function sanitizeNextPath(raw: string | null): string {
   if (!raw) return "/";
@@ -34,11 +39,28 @@ function SignUpPageContent() {
   const [resendLoading, setResendLoading] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
-  // Active cooldown countdown ticker
+  // Restore persistent cooldown across page reloads / tab visits
   useEffect(() => {
-    if (cooldownSeconds <= 0) return;
+    const savedCooldown = getPersistentCooldown("signup");
+    if (savedCooldown > 0) {
+      setCooldownSeconds(savedCooldown);
+    }
+  }, []);
+
+  // Active countdown ticker
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      clearPersistentCooldown("signup");
+      return;
+    }
     const timer = setInterval(() => {
-      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          clearPersistentCooldown("signup");
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
@@ -49,7 +71,14 @@ function SignUpPageContent() {
     setErrorCode(null);
     setSuccessMsg("");
 
-    if (loading || cooldownSeconds > 0) return;
+    // Persistent debounce guard: prevent duplicate submission
+    const currentRemaining = getPersistentCooldown("signup");
+    if (loading || currentRemaining > 0) {
+      if (currentRemaining > 0) {
+        setCooldownSeconds(currentRemaining);
+      }
+      return;
+    }
 
     if (!name.trim() || !email.trim()) {
       setError("Please fill in your name and email address.");
@@ -68,12 +97,14 @@ function SignUpPageContent() {
         setError(result.error || "Unable to create your account right now. Please try again.");
         if (result.retryAfterSeconds) {
           setCooldownSeconds(result.retryAfterSeconds);
+          setPersistentCooldown("signup", result.retryAfterSeconds);
         }
         return;
       }
       if (result.emailConfirmationRequired) {
         setEmailConfirmationPending(true);
         setCooldownSeconds(60);
+        setPersistentCooldown("signup", 60);
         setSuccessMsg(
           result.message ||
             "Account created! Please check your email to verify your address before signing in."
@@ -90,7 +121,12 @@ function SignUpPageContent() {
   };
 
   const handleResendVerification = async () => {
-    if (!email.trim() || resendLoading || cooldownSeconds > 0) return;
+    const currentRemaining = getPersistentCooldown("signup");
+    if (!email.trim() || resendLoading || currentRemaining > 0) {
+      if (currentRemaining > 0) setCooldownSeconds(currentRemaining);
+      return;
+    }
+
     setResendLoading(true);
     setError("");
     try {
@@ -98,10 +134,12 @@ function SignUpPageContent() {
       if (res.ok) {
         setSuccessMsg(res.message || "Verification email sent. Please check your inbox and spam folder.");
         setCooldownSeconds(60);
+        setPersistentCooldown("signup", 60);
       } else {
         setError(res.error || "Unable to resend verification email.");
         if (res.retryAfterSeconds) {
           setCooldownSeconds(res.retryAfterSeconds);
+          setPersistentCooldown("signup", res.retryAfterSeconds);
         }
       }
     } catch {
