@@ -31,8 +31,10 @@ jobs:
       - name: Install NPM Dependencies
         run: npm ci
 
-      - name: Sync Capacitor Android
-        run: npx cap sync android
+      - name: Update Web Shell Assets
+        run: |
+          mkdir -p android/app/src/main/assets/public
+          cp -r android-shell/* android/app/src/main/assets/public/
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x android/gradlew
@@ -47,7 +49,11 @@ jobs:
           mkdir -p apk-output
           
           # Locate apksigner in the preinstalled Android SDK build-tools
-          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find $SDK_DIR/build-tools -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$APKSIGNER" ]; then
+            APKSIGNER="apksigner"
+          fi
           echo "Using apksigner: $APKSIGNER"
 
           # Generate an ephemeral CI signing keystore
