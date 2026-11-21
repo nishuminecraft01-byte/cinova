@@ -109,25 +109,45 @@ jobs:
             --ks-key-alias cinova \
             --ks-pass pass:cinova123 \
             --key-pass pass:cinova123 \
-            --out apk-output/CINOVA-v1.0-release.apk \
+            --out apk-output/CINOVA.apk \
             "$RELEASE_APK"
-
-          # Preserve raw unsigned release APK and debug APK
-          cp "$RELEASE_APK" apk-output/CINOVA-v1.0-unsigned.apk
-          if [ -n "$DEBUG_APK" ] && [ -f "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" apk-output/CINOVA-v1.0-debug.apk
-          fi
 
           # Verify signatures
           echo "=== Verifying signed release APK ==="
-          $APKSIGNER verify --verbose apk-output/CINOVA-v1.0-release.apk
+          $APKSIGNER verify --verbose apk-output/CINOVA.apk
 
           echo "=== Final APK Artifacts ==="
           ls -lh apk-output/
+          stat -c "Generated APK: %n | Exact File Size: %s bytes" apk-output/CINOVA.apk
 
-      - name: Upload APKs as GitHub Actions Artifact
+      - name: Upload CINOVA.apk as GitHub Actions Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CINOVA-Android-APK
-          path: apk-output/*.apk
+          name: CINOVA-apk
+          path: apk-output/CINOVA.apk
           retention-days: 30
+
+      - name: Publish Standalone CINOVA.apk to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: apk-latest
+          name: "CINOVA Android Release APK"
+          body: "Direct standalone download of CINOVA.apk for Android devices. No zip extraction needed."
+          files: apk-output/CINOVA.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Standalone CINOVA.apk to release-apk branch
+        if: startsWith(github.ref, 'refs/heads/main')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan release-apk 2>/dev/null || git checkout -B release-apk
+          git rm -rf . > /dev/null 2>&1 || true
+          cp apk-output/CINOVA.apk ./CINOVA.apk
+          git add CINOVA.apk
+          git commit -m "chore(release): standalone CINOVA.apk binary" || true
+          git push -f origin release-apk || true

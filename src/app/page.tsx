@@ -10,6 +10,7 @@ import Top10Row from "@/components/Top10Row";
 import MovieCard from "@/components/MovieCard";
 import CinovaImage from "@/components/CinovaImage";
 import WorldwideDiscoveryHub from "@/components/WorldwideDiscoveryHub";
+import AppDownloadBanner from "@/components/AppDownloadBanner";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { GENRES } from "@/data/genres";
 import { FRANCHISE_COLLECTIONS } from "@/data/movies";
@@ -358,6 +359,9 @@ export default function HomePage() {
           exploreHref="/search?type=anime"
           onOpenModal={handleOpenModal}
         />
+
+        {/* CINOVA Native App & PWA Download / Install Section */}
+        <AppDownloadBanner />
 
         {/* 2. Trending Now */}
         <MovieRow
