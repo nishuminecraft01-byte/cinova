@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, AlertCircle, Info } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle, Info, CheckCircle2, RotateCw, Send } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import AuthShell from "@/components/AuthShell";
 
@@ -20,7 +20,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = sanitizeNextPath(searchParams?.get("next") || null);
-  const { login, authConfigured } = useAuth();
+  const { login, resendVerification, resetPassword, authConfigured } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,11 +28,28 @@ function LoginPageContent() {
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotHelp, setShowForgotHelp] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  // Active cooldown timer
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setErrorCode(null);
+    setInfoMsg("");
+
     if (!email.trim() || !password) {
       setError("Please enter both your email address and password.");
       return;
@@ -41,7 +58,11 @@ function LoginPageContent() {
     try {
       const result = await login(email.trim(), password);
       if (!result.ok) {
+        setErrorCode(result.code || null);
         setError(result.error || "Unable to sign in right now. Please try again.");
+        if (result.retryAfterSeconds) {
+          setCooldownSeconds(result.retryAfterSeconds);
+        }
         return;
       }
       if (result.user?.role === "admin" && (nextPath === "/" || !nextPath)) {
@@ -54,6 +75,57 @@ function LoginPageContent() {
       setError("Unable to sign in right now. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim() || resendLoading || cooldownSeconds > 0) return;
+    setResendLoading(true);
+    setError("");
+    setInfoMsg("");
+    try {
+      const res = await resendVerification(email.trim());
+      if (res.ok) {
+        setInfoMsg(res.message || "Verification email sent. Please check your inbox and spam folder.");
+        setCooldownSeconds(60);
+      } else {
+        setError(res.error || "Unable to resend verification email.");
+        if (res.retryAfterSeconds) {
+          setCooldownSeconds(res.retryAfterSeconds);
+        }
+      }
+    } catch {
+      setError("Unable to resend verification email right now. Please try again later.");
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email.trim() || resetLoading || cooldownSeconds > 0) {
+      if (!email.trim()) {
+        setError("Please enter your account email address above to reset your password.");
+      }
+      return;
+    }
+    setResetLoading(true);
+    setError("");
+    setInfoMsg("");
+    try {
+      const res = await resetPassword(email.trim());
+      if (res.ok) {
+        setInfoMsg(res.message || "Password reset link sent! Check your inbox.");
+        setCooldownSeconds(60);
+      } else {
+        setError(res.error || "Unable to send password reset email.");
+        if (res.retryAfterSeconds) {
+          setCooldownSeconds(res.retryAfterSeconds);
+        }
+      }
+    } catch {
+      setError("Unable to process password reset right now. Please try again later.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -91,14 +163,55 @@ function LoginPageContent() {
         </div>
       )}
 
+      {/* Information / Success Banner */}
+      {infoMsg && (
+        <div
+          role="status"
+          className="mb-5 px-3.5 py-3 rounded-xl bg-emerald-500/[0.09] border border-emerald-500/30 text-emerald-300 text-xs flex items-start gap-2.5"
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <span className="leading-relaxed">{infoMsg}</span>
+        </div>
+      )}
+
       {/* Validation / Auth Error */}
       {error && (
         <div
           role="alert"
-          className="mb-5 px-3.5 py-3 rounded-xl bg-red-500/[0.09] border border-red-500/25 text-red-300 text-xs flex items-start gap-2.5"
+          className="mb-5 px-3.5 py-3 rounded-xl bg-red-500/[0.09] border border-red-500/25 text-red-300 text-xs flex flex-col gap-2"
         >
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-          <span className="leading-relaxed">{error}</span>
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{error}</span>
+          </div>
+
+          {errorCode === "EMAIL_NOT_CONFIRMED" && (
+            <div className="pt-1.5 pl-6 flex flex-wrap items-center justify-between gap-2 border-t border-red-500/20">
+              <span className="text-[11px] text-red-300/80">Need another confirmation link?</span>
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendLoading || cooldownSeconds > 0}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-[11px] font-semibold text-red-200 transition-colors"
+              >
+                {resendLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RotateCw className="w-3 h-3" />
+                )}
+                <span>
+                  {cooldownSeconds > 0 ? `Resend in ${cooldownSeconds}s` : "Resend Verification"}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {cooldownSeconds > 0 && errorCode !== "EMAIL_NOT_CONFIRMED" && (
+            <div className="pl-6 text-[11px] text-[#AAA0A7]">
+              Cooldown active: You can retry in{" "}
+              <span className="font-semibold text-white">{cooldownSeconds}s</span>.
+            </div>
+          )}
         </div>
       )}
 
@@ -138,7 +251,10 @@ function LoginPageContent() {
             </label>
             <button
               type="button"
-              onClick={() => setShowForgotHelp((prev) => !prev)}
+              onClick={() => {
+                setShowForgotHelp((prev) => !prev);
+                if (error) setError("");
+              }}
               className="text-xs font-medium text-[#FF385B] hover:text-[#F5F1F3] transition-colors"
             >
               Forgot password?
@@ -173,11 +289,29 @@ function LoginPageContent() {
           </div>
         </div>
 
-        {/* Inline Forgot Password Guidance */}
+        {/* Interactive Forgot Password Assistance */}
         {showForgotHelp && (
-          <div className="px-3.5 py-3 rounded-xl bg-[#160B10] border border-[rgba(155,25,57,0.28)] text-xs text-[#AAA0A7] leading-relaxed animate-fade-in">
-            Need help signing in? Enter your account email above to continue, or contact{" "}
-            <span className="text-[#F5F1F3] font-medium">support@cinova.stream</span> for account recovery assistance.
+          <div className="p-3.5 rounded-xl bg-[#160B10] border border-[rgba(155,25,57,0.34)] text-xs text-[#AAA0A7] leading-relaxed space-y-2.5 animate-fade-in">
+            <p>
+              Forgot your password? Enter your email address above and click below to receive a secure recovery link.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetLoading || cooldownSeconds > 0 || !email.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#C8123F] to-[#A30D32] hover:from-[#E11D48] hover:to-[#B9123B] disabled:opacity-50 disabled:cursor-not-allowed text-xs font-semibold text-white transition-all shadow-[0_4px_14px_rgba(163,13,50,0.3)]"
+              >
+                {resetLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : "Send Password Reset Link"}
+                </span>
+              </button>
+            </div>
           </div>
         )}
 

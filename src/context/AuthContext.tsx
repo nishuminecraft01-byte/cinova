@@ -7,6 +7,8 @@ export interface AuthActionResult {
   ok: boolean;
   user?: UserProfile | null;
   error?: string;
+  code?: string;
+  retryAfterSeconds?: number;
   setupRequired?: boolean;
   emailConfirmationRequired?: boolean;
   message?: string;
@@ -19,6 +21,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<AuthActionResult>;
   signup: (name: string, email: string, password: string) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
+  resendVerification: (email: string) => Promise<AuthActionResult>;
+  resetPassword: (email: string) => Promise<AuthActionResult>;
   refreshSession: () => Promise<void>;
   updateProfile: (updates: Pick<Partial<UserProfile>, "name" | "avatar">) => void;
 }
@@ -83,6 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok || !data?.success) {
           return {
             ok: false,
+            code: data?.code,
+            retryAfterSeconds: data?.retryAfterSeconds,
             error: data?.error || "Invalid email or password.",
           };
         }
@@ -121,6 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok || !data?.success) {
           return {
             ok: false,
+            code: data?.code,
+            retryAfterSeconds: data?.retryAfterSeconds,
             error: data?.error || "Unable to create account.",
           };
         }
@@ -137,6 +145,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: "Unable to create your account right now." };
       } finally {
         setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const resendVerification = useCallback(
+    async (email: string): Promise<AuthActionResult> => {
+      try {
+        const res = await fetch("/api/auth/resend-verification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.success) {
+          return {
+            ok: false,
+            code: data?.code,
+            retryAfterSeconds: data?.retryAfterSeconds,
+            error: data?.error || "Unable to send verification email.",
+          };
+        }
+        return {
+          ok: true,
+          message: data.message || "Verification email sent. Please check your inbox.",
+        };
+      } catch {
+        return { ok: false, error: "Unable to send verification email right now. Please try again later." };
+      }
+    },
+    []
+  );
+
+  const resetPassword = useCallback(
+    async (email: string): Promise<AuthActionResult> => {
+      try {
+        const res = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.success) {
+          return {
+            ok: false,
+            code: data?.code,
+            retryAfterSeconds: data?.retryAfterSeconds,
+            error: data?.error || "Unable to send password reset email.",
+          };
+        }
+        return {
+          ok: true,
+          message: data.message || "Password reset link sent! Please check your email inbox.",
+        };
+      } catch {
+        return { ok: false, error: "Unable to process password reset right now. Please try again later." };
       }
     },
     []
@@ -161,7 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (updates: Pick<Partial<UserProfile>, "name" | "avatar">) => {
       setUser((prev) => {
         if (!prev) return prev;
-        // Never allow client-side role or membership tier elevation
         return {
           ...prev,
           ...(typeof updates.name === "string" ? { name: updates.name } : {}),
@@ -180,10 +247,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       signup,
       logout,
+      resendVerification,
+      resetPassword,
       refreshSession,
       updateProfile,
     }),
-    [user, isLoading, authConfigured, login, signup, logout, refreshSession, updateProfile]
+    [user, isLoading, authConfigured, login, signup, logout, resendVerification, resetPassword, refreshSession, updateProfile]
   );
 
   return (

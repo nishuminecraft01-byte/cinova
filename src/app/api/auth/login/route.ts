@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSupabaseServerAnonClient,
@@ -6,8 +5,7 @@ import {
   isSupabaseAuthConfigured,
   setAuthSessionCookies,
 } from "@/lib/supabase-server";
-import { getPlanById, resolveEffectiveTier } from "@/lib/membership";
-import { UserProfile } from "@/types/movie";
+import { parseAuthError } from "@/lib/auth-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { success: false, error: "Please enter both your email and password." },
+        { success: false, error: "Please enter both your email address and password." },
         { status: 400, headers: { "Cache-Control": "no-store" } }
       );
     }
@@ -54,12 +52,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (error || !data?.session || !data?.user) {
+      const parsed = parseAuthError(error, "Invalid email or password.");
       return NextResponse.json(
         {
           success: false,
-          error: error?.message || "Invalid email or password.",
+          code: parsed.code,
+          email,
+          error: parsed.message,
+          retryAfterSeconds: parsed.retryAfterSeconds,
         },
-        { status: 401, headers: { "Cache-Control": "no-store" } }
+        {
+          status: parsed.isEmailNotConfirmed ? 403 : parsed.isRateLimit ? 429 : 401,
+          headers: { "Cache-Control": "no-store" },
+        }
       );
     }
 
@@ -81,7 +86,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch {
     return NextResponse.json(
-      { success: false, error: "Unable to complete sign-in right now." },
+      { success: false, error: "Unable to complete sign-in right now. Please try again later." },
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }

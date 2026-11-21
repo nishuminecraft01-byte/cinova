@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSupabaseServerAnonClient,
@@ -7,6 +6,7 @@ import {
 } from "@/lib/supabase-server";
 import { getPlanById } from "@/lib/membership";
 import { UserProfile } from "@/types/movie";
+import { parseAuthError } from "@/lib/auth-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +64,28 @@ export async function POST(request: NextRequest) {
     });
 
     if (error || !data?.user) {
+      const parsed = parseAuthError(error, "Unable to create account.");
       return NextResponse.json(
         {
           success: false,
-          error: error?.message || "Unable to create account.",
+          code: parsed.code,
+          error: parsed.message,
+          retryAfterSeconds: parsed.retryAfterSeconds,
         },
-        { status: 400, headers: { "Cache-Control": "no-store" } }
+        { status: parsed.isRateLimit ? 429 : 400, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    // Supabase anti-enumeration detection:
+    // If identities array is empty, user is already registered in the database.
+    if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "USER_ALREADY_EXISTS",
+          error: "An account with this email address already exists. Please sign in or reset your password.",
+        },
+        { status: 409, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -127,14 +143,15 @@ export async function POST(request: NextRequest) {
       {
         success: true,
         emailConfirmationRequired: true,
-        message: "Account created. Please check your email to confirm your address before signing in.",
+        email,
+        message: "Account created! Please check your email inbox to verify your address before signing in.",
         user: null,
       },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch {
     return NextResponse.json(
-      { success: false, error: "Unable to create your account right now." },
+      { success: false, error: "Unable to create your account right now. Please try again later." },
       { status: 500, headers: { "Cache-Control": "no-store" } }
     );
   }
