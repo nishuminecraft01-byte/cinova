@@ -10,6 +10,8 @@ jobs:
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -47,13 +49,20 @@ jobs:
       - name: Build Android Release APK
         working-directory: ./android
         run: |
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle.log
 
-      - name: Print Gradle Error on Failure
+      - name: Publish Diagnostic Log on Failure
         if: failure()
         run: |
-          echo "=== GRADLE REPORT ERRORS ==="
-          find android/ -name "*.txt" -o -name "*.log" | xargs tail -n 50 2>/dev/null || true
+          echo "=== PUSHING DIAGNOSTIC LOG TO CI-DIAGNOSTICS BRANCH ==="
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan ci-diagnostics 2>/dev/null || git checkout -B ci-diagnostics
+          git rm -rf . > /dev/null 2>&1 || true
+          cp gradle.log build-failure-diagnostic.txt
+          git add build-failure-diagnostic.txt
+          git commit -m "chore(ci): capture build diagnostic log" || true
+          git push -f origin ci-diagnostics || true
 
       - name: Locate and Sign Release APK for Direct Installation
         run: |
