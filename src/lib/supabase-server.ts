@@ -47,9 +47,13 @@ function isRealEnvValue(val: string | undefined): boolean {
   return true;
 }
 
+export const DEFAULT_SUPABASE_URL = "https://cokkdjkdudeedknjwmzh.supabase.co";
+export const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_OwzQUJsjKUDnO4JIbCvmIQ_OLidVyee";
+
 /**
  * Reads Supabase public configuration from server environment variables.
  * Supports both modern Publishable keys (`sb_publishable_...`) and legacy JWT anon keys.
+ * Falls back to project production defaults so auth is always active.
  * Does NOT require a Service Role key for normal user signup/login.
  */
 export function getSupabasePublicConfig(): {
@@ -57,11 +61,15 @@ export function getSupabasePublicConfig(): {
   anonKey: string | null;
   configured: boolean;
 } {
-  const url = cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const anonKey = cleanEnvValue(
+  const envUrl = cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const envAnonKey = cleanEnvValue(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   );
+
+  const url = isRealEnvValue(envUrl) ? envUrl : DEFAULT_SUPABASE_URL;
+  const anonKey = isRealEnvValue(envAnonKey) ? envAnonKey : DEFAULT_SUPABASE_ANON_KEY;
+
   const validUrl =
     isRealEnvValue(url) &&
     (url.startsWith("https://") || url.startsWith("http://"));

@@ -2,8 +2,11 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Movie, StreamingServer } from "@/types/movie";
 
 function getDatabaseClient(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cokkdjkdudeedknjwmzh.supabase.co";
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "sb_publishable_OwzQUJsjKUDnO4JIbCvmIQ_OLidVyee";
   if (!url || !key) return null;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
