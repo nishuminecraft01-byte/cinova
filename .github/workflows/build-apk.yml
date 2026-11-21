@@ -42,20 +42,28 @@ jobs:
       - name: Build Android Release and Debug APKs
         working-directory: ./android
         run: |
-          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-build.log || (echo "=== GRADLE BUILD FAILED ===" && tail -n 120 gradle-build.log && exit 1)
+          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
 
-      - name: Upload Build Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-failure-log
-          path: android/gradle-build.log
-
-      - name: Sign Release APK for Direct Installation
+      - name: Locate and Sign Release APK for Direct Installation
         run: |
           mkdir -p apk-output
-          
-          # Locate apksigner in the preinstalled Android SDK build-tools
+
+          echo "=== All Generated Build Outputs ==="
+          find android/app/build/outputs/apk -type f -ls
+
+          # Find release APK
+          RELEASE_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          DEBUG_APK=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+
+          echo "Found Release APK: $RELEASE_APK"
+          echo "Found Debug APK: $DEBUG_APK"
+
+          if [ -z "$RELEASE_APK" ]; then
+            echo "ERROR: No release APK found!"
+            exit 1
+          fi
+
+          # Locate apksigner in preinstalled Android SDK build-tools
           SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           APKSIGNER=$(find $SDK_DIR/build-tools -name apksigner 2>/dev/null | sort -V | tail -n 1)
           if [ -z "$APKSIGNER" ]; then
@@ -74,24 +82,26 @@ jobs:
             -keypass cinova123 \
             -dname "CN=CINOVA, OU=Mobile, O=CINOVA OTT, L=Mumbai, ST=MH, C=IN"
 
-          # Sign release APK with Android v2 + v3 signature schemes
+          # Sign release APK with Android v2 + v3 signature schemes for instant phone installation
           $APKSIGNER sign \
             --ks ci-release.keystore \
             --ks-key-alias cinova \
             --ks-pass pass:cinova123 \
             --key-pass pass:cinova123 \
             --out apk-output/CINOVA-v1.0-release.apk \
-            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            "$RELEASE_APK"
 
-          # Copy raw unsigned release APK and debug APK
-          cp android/app/build/outputs/apk/release/app-release-unsigned.apk apk-output/CINOVA-v1.0-unsigned.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/CINOVA-v1.0-debug.apk
+          # Preserve raw unsigned release APK and debug APK
+          cp "$RELEASE_APK" apk-output/CINOVA-v1.0-unsigned.apk
+          if [ -n "$DEBUG_APK" ] && [ -f "$DEBUG_APK" ]; then
+            cp "$DEBUG_APK" apk-output/CINOVA-v1.0-debug.apk
+          fi
 
           # Verify signatures
           echo "=== Verifying signed release APK ==="
           $APKSIGNER verify --verbose apk-output/CINOVA-v1.0-release.apk
 
-          echo "=== Generated APK Files ==="
+          echo "=== Final APK Artifacts ==="
           ls -lh apk-output/
 
       - name: Upload APKs as GitHub Actions Artifact
