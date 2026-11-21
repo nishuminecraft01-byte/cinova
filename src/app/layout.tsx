@@ -8,6 +8,7 @@ export const viewport: Viewport = {
   themeColor: "#080506",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
   viewportFit: "cover",
 };
 
@@ -15,6 +16,16 @@ export const metadata: Metadata = {
   title: "CINOVA — Stories. Anytime. Anywhere.",
   description:
     "Experience futuristic cinematic streaming on CINOVA. Stream global 4K movies, acclaimed series, and anime in Dolby Atmos.",
+  applicationName: "CINOVA",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CINOVA",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   keywords: [
     "streaming",
     "movies",
@@ -25,11 +36,19 @@ export const metadata: Metadata = {
     "Dolby Atmos",
     "cinema",
     "CINOVA",
+    "PWA",
   ],
   icons: {
-    icon: "/icon.svg",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
   openGraph: {
     title: "CINOVA — Stories. Anytime. Anywhere.",
@@ -46,6 +65,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="CINOVA" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.json" />
         <style
           dangerouslySetInnerHTML={{
             __html: `

@@ -7,6 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import PlaybackAuthGate from "@/components/PlaybackAuthGate";
+import PwaManager from "@/components/PwaManager";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -28,6 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <BottomNav />
       <PlaybackAuthGate />
+      <PwaManager />
     </>
   );
 }

@@ -14,6 +14,7 @@ import {
   Sliders,
   Volume2,
   Shield,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useWatchlist } from "@/context/WatchlistContext";
@@ -463,6 +464,33 @@ function ProfileContent() {
               onChange={(e) => setPreferSubtitles(e.target.checked)}
               className="w-4 h-4 accent-[#E11D48] shrink-0"
             />
+          </div>
+
+          <div className="pt-4 border-t border-[rgba(155,25,57,0.18)]">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[#AAA0A7] mb-3">
+              Progressive Web App
+            </h4>
+            <div className="p-4 rounded-xl bg-[#160B10] border border-[rgba(155,25,57,0.24)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold text-[#F5F1F3] flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-[#FF385B]" />
+                  Install CINOVA on this Device
+                </p>
+                <p className="text-[11px] text-[#AAA0A7] mt-0.5 leading-relaxed">
+                  Fast fullscreen OTT streaming, quick launch from your home screen or desktop, and offline library support.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const event = new CustomEvent("cinova-trigger-install");
+                  window.dispatchEvent(event);
+                }}
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-[#A30D32] to-[#E11D48] hover:from-[#B9123B] hover:to-[#FF385B] text-[#F5F1F3] font-semibold text-xs transition-all shrink-0 shadow-md self-start sm:self-auto"
+              >
+                Install App
+              </button>
+            </div>
           </div>
 
           <button
