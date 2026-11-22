@@ -61,6 +61,32 @@ public class CinovaNativeBridge {
     }
 
     @JavascriptInterface
+    public int getStatusBarHeightDp() {
+        if (activity == null) return 0;
+        try {
+            int resourceId = activity.getResources().getIdentifier("status_bar_height", "dimen", "android");
+            int px = resourceId > 0 ? activity.getResources().getDimensionPixelSize(resourceId) : 0;
+            float density = activity.getResources().getDisplayMetrics().density;
+            return density > 0 ? (int) (px / density) : 24;
+        } catch (Exception e) {
+            return 24;
+        }
+    }
+
+    @JavascriptInterface
+    public int getNavigationBarHeightDp() {
+        if (activity == null) return 0;
+        try {
+            int resourceId = activity.getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+            int px = resourceId > 0 ? activity.getResources().getDimensionPixelSize(resourceId) : 0;
+            float density = activity.getResources().getDisplayMetrics().density;
+            return density > 0 ? (int) (px / density) : 16;
+        } catch (Exception e) {
+            return 16;
+        }
+    }
+
+    @JavascriptInterface
     public void startUpdate(final String apkUrl, final String targetVersion) {
         if (activity == null || apkUrl == null || apkUrl.isEmpty()) {
             return;

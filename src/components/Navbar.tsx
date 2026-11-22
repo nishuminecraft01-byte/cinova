@@ -138,13 +138,16 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 h-16 transition-all duration-300 ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
             ? "bg-[#080506]/92 backdrop-blur-xl border-b border-[rgba(155,25,57,0.24)] shadow-[0_8px_28px_rgba(0,0,0,0.65)]"
             : "bg-gradient-to-b from-[#080506]/95 via-[#080506]/70 to-transparent border-b border-[rgba(155,25,57,0.14)]"
         }`}
+        style={{
+          paddingTop: "var(--safe-top, 0px)",
+        }}
       >
-        <div className="w-full h-full px-3 sm:px-5 xl:px-6 flex items-center justify-between gap-2 xl:gap-4">
+        <div className="w-full h-16 px-3 sm:px-5 xl:px-6 flex items-center justify-between gap-2 xl:gap-4">
           {/* Left: Brand Logo & Primary Navigation */}
           <div className="flex items-center gap-3 xl:gap-6 min-w-0 flex-1">
             <Link
@@ -406,7 +409,8 @@ export default function Navbar() {
           <>
             <div
               onClick={() => setMobileSearchOpen(false)}
-              className="md:hidden fixed inset-0 top-16 bg-black/65 z-40"
+              className="md:hidden fixed inset-0 bg-black/65 z-40"
+              style={{ top: "calc(4rem + var(--safe-top, 0px))" }}
               aria-hidden="true"
             />
             <div className="md:hidden relative z-50 bg-[#0B0508]/98 backdrop-blur-xl border-b border-[rgba(155,25,57,0.28)] px-4 py-3.5 space-y-3 animate-fade-in shadow-2xl">
@@ -480,10 +484,14 @@ export default function Navbar() {
           <>
             <div
               onClick={() => setMobileMenuOpen(false)}
-              className="lg:hidden fixed inset-0 top-16 bg-black/65 z-40"
+              className="lg:hidden fixed inset-0 bg-black/65 z-40"
+              style={{ top: "calc(4rem + var(--safe-top, 0px))" }}
               aria-hidden="true"
             />
-            <div className="lg:hidden relative z-50 bg-[#0B0508]/98 backdrop-blur-xl border-b border-[rgba(155,25,57,0.26)] px-4 py-4 space-y-1.5 text-sm font-medium animate-fade-in max-h-[calc(100dvh-4rem)] overflow-y-auto">
+            <div
+              className="lg:hidden relative z-50 bg-[#0B0508]/98 backdrop-blur-xl border-b border-[rgba(155,25,57,0.26)] px-4 py-4 space-y-1.5 text-sm font-medium animate-fade-in overflow-y-auto"
+              style={{ maxHeight: "calc(100dvh - 4rem - var(--safe-top, 0px))" }}
+            >
               {/* Mobile Search (16px font prevents iOS Safari auto-zoom) */}
               <form onSubmit={handleSearchSubmit} className="relative mb-3">
                 <Search className="w-4 h-4 text-[#746971] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />

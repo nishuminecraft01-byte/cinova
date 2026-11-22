@@ -83,7 +83,7 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
       ref={heroRef}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative w-full h-[70dvh] sm:h-[74vh] min-h-[480px] sm:min-h-[540px] max-h-[760px] overflow-hidden bg-[#080506] select-none group/hero"
+      className="relative w-full h-[72dvh] sm:h-[76vh] min-h-[510px] sm:min-h-[540px] max-h-[780px] overflow-hidden bg-[#080506] select-none group/hero"
     >
       {/* Background Cinematic Backdrop positioned toward the right (w1280 saves ~80% vs /original/) */}
       <div className="absolute inset-0">
@@ -95,7 +95,7 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
           tmdbSize="w1280"
           loading="eager"
           fetchPriority="high"
-          className="w-full h-full object-cover object-top sm:object-center lg:object-[72%_20%] opacity-85 transition-transform duration-700 ease-out scale-[1.01] group-hover/hero:scale-[1.03]"
+          className="w-full h-full object-cover object-top sm:object-center lg:object-[72%_20%] opacity-95 sm:opacity-95 lg:opacity-100 transition-transform duration-700 ease-out scale-[1.01] group-hover/hero:scale-[1.03]"
           containerClassName="w-full h-full"
         />
 
@@ -105,17 +105,26 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "radial-gradient(620px circle at 68% 36%, rgba(163, 13, 50, 0.22), transparent 65%)",
+              "radial-gradient(620px circle at 68% 36%, rgba(163, 13, 50, 0.25), transparent 65%)",
           }}
         />
 
-        {/* Multi-layer Cinematic Dark Maroon Vignettes (stronger bottom scrim on mobile for crisp readability) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#080506] via-[#080506]/82 to-transparent w-full lg:w-[74%]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080506] via-[#080506]/65 sm:via-[#080506]/35 to-[#080506]/45" />
+        {/* Cinematic Vignettes:
+            - Desktop horizontal vignette: protects text contrast without hiding artwork on the right
+            - Vertical bottom scrim: ensures title & buttons contrast while leaving artwork vivid on mobile
+            - Subtle top vignette: ensures header and status bar clarity */}
+        <div className="hidden sm:block absolute inset-0 bg-gradient-to-r from-[#080506] via-[#080506]/75 to-transparent w-[80%] lg:w-[65%]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080506] via-[#080506]/60 via-40% sm:via-[#080506]/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#080506]/70 via-transparent to-transparent h-24 pointer-events-none" />
       </div>
 
       {/* Hero Foreground Content */}
-      <div className="relative h-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-9 sm:pb-20 pt-20 sm:pt-24 z-20">
+      <div
+        className="relative h-full max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-7 sm:pb-20 z-20"
+        style={{
+          paddingTop: "calc(4.5rem + var(--safe-top, 0px))",
+        }}
+      >
         <div className="flex items-end justify-between gap-6">
           <div className="w-full max-w-xl lg:max-w-2xl space-y-3 sm:space-y-4 animate-hero-fade" key={currentMovie.id}>
             {/* Small TRENDING NOW Label */}
@@ -129,8 +138,8 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
               {currentMovie.title}
             </h1>
 
-            {/* Concise Synopsis */}
-            <p className="text-[13px] sm:text-[15px] text-[#AAA0A7] line-clamp-2 sm:line-clamp-3 leading-relaxed max-w-lg">
+            {/* Clean Responsive Synopsis */}
+            <p className="text-[13px] sm:text-[15px] text-[#C4BCC1] sm:text-[#AAA0A7] line-clamp-3 leading-relaxed max-w-lg break-words hyphens-none">
               {currentMovie.description || currentMovie.tagline}
             </p>
 
@@ -171,7 +180,7 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
             <div className="flex items-center flex-wrap gap-2.5 sm:gap-3 pt-1.5">
               <Link
                 href={`/watch/${currentMovie.id}`}
-                className="flex-1 sm:flex-none min-h-[44px] inline-flex items-center justify-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-[#C8123F] to-[#A30D32] hover:from-[#E11D48] hover:to-[#B9123B] text-[#F5F1F3] font-semibold text-sm transition-all duration-200 shadow-[0_8px_24px_rgba(163,13,50,0.42)] hover:shadow-[0_10px_28px_rgba(225,29,72,0.48)] active:scale-[0.98]"
+                className="flex-1 sm:flex-none min-w-[130px] min-h-[44px] inline-flex items-center justify-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-[#C8123F] to-[#A30D32] hover:from-[#E11D48] hover:to-[#B9123B] text-[#F5F1F3] font-semibold text-sm transition-all duration-200 shadow-[0_8px_24px_rgba(163,13,50,0.42)] hover:shadow-[0_10px_28px_rgba(225,29,72,0.48)] active:scale-[0.98]"
               >
                 <Play className="w-4 h-4 fill-[#F5F1F3] text-[#F5F1F3] ml-0.5" />
                 <span>Watch Now</span>
@@ -180,10 +189,11 @@ function HeroBannerComponent({ featuredMovies, onOpenModal }: HeroBannerProps) {
               <button
                 type="button"
                 onClick={() => toggleWatchlist(currentMovie.id)}
-                className={`flex-1 sm:flex-none min-h-[44px] inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold text-sm transition-all duration-200 border backdrop-blur-md active:scale-[0.98] ${inWatchlist
-                  ? "bg-[#650A20]/55 border-[#E11D48]/55 text-[#F5F1F3]"
-                  : "bg-[#160B10]/70 hover:bg-[#1D0C13] border-[rgba(155,25,57,0.42)] hover:border-[#E11D48]/55 text-[#F5F1F3]"
-                  }`}
+                className={`flex-1 sm:flex-none min-w-[130px] min-h-[44px] inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full font-semibold text-sm transition-all duration-200 border backdrop-blur-md active:scale-[0.98] ${
+                  inWatchlist
+                    ? "bg-[#650A20]/55 border-[#E11D48]/55 text-[#F5F1F3]"
+                    : "bg-[#160B10]/70 hover:bg-[#1D0C13] border-[rgba(155,25,57,0.42)] hover:border-[#E11D48]/55 text-[#F5F1F3]"
+                }`}
               >
                 {inWatchlist ? <Check className="w-4 h-4 text-[#FF385B]" /> : <Plus className="w-4 h-4" />}
                 <span>{inWatchlist ? "In My List" : "Add to List"}</span>

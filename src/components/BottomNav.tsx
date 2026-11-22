@@ -31,7 +31,10 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0508]/95 backdrop-blur-xl border-t border-[rgba(155,25,57,0.24)] px-2 pt-1.5 pb-safe shadow-[0_-8px_24px_rgba(0,0,0,0.65)]"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0508]/95 backdrop-blur-xl border-t border-[rgba(155,25,57,0.24)] px-2 pt-1.5 shadow-[0_-8px_24px_rgba(0,0,0,0.65)]"
+      style={{
+        paddingBottom: "max(var(--safe-bottom, 0px), 8px)",
+      }}
     >
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {items.map((item) => {
