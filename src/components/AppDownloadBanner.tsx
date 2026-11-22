@@ -1,11 +1,20 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Download, Smartphone, Check, Sparkles, ShieldCheck, ArrowDownToLine, Monitor } from "lucide-react";
+import { Smartphone, Check, Sparkles, ShieldCheck, ArrowDownToLine, Monitor, Tag } from "lucide-react";
+
+interface AppVersionInfo {
+  versionCode: number;
+  versionName: string;
+  apkUrl: string;
+  apkSize: number;
+  releaseNotes: string;
+}
 
 export default function AppDownloadBanner() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [installStatus, setInstallStatus] = useState<"idle" | "triggered" | "installed">("idle");
+  const [appVersion, setAppVersion] = useState<AppVersionInfo | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -25,6 +34,15 @@ export default function AppDownloadBanner() {
     };
 
     window.addEventListener("appinstalled", onAppInstalled);
+
+    // Fetch dynamic version info from CINOVA domain
+    fetch("/api/app-version")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: AppVersionInfo | null) => {
+        if (data) setAppVersion(data);
+      })
+      .catch(() => {});
+
     return () => window.removeEventListener("appinstalled", onAppInstalled);
   }, []);
 
@@ -38,7 +56,11 @@ export default function AppDownloadBanner() {
     }, 4000);
   };
 
-  const directApkUrl = "https://github.com/nishuminecraft01-byte/cinova/releases/download/apk-latest/CINOVA.apk";
+  const selfHostedApkUrl = "/CINOVA.apk";
+  const displayVersion = appVersion?.versionName ? `v${appVersion.versionName}` : "v1.1.0";
+  const displaySize = appVersion?.apkSize
+    ? `${(appVersion.apkSize / (1024 * 1024)).toFixed(1)} MB`
+    : "3.2 MB";
 
   return (
     <section className="relative px-4 sm:px-6 lg:px-8 max-w-[1380px] mx-auto my-8">
@@ -60,14 +82,19 @@ export default function AppDownloadBanner() {
             </h2>
 
             <p className="text-sm sm:text-base text-[#AAA0A7] leading-relaxed">
-              Install the high-speed progressive web app directly in your browser, or download the standalone
-              Android APK file for direct phone installation. Fast, lightweight, and no ZIP extraction required.
+              Install the high-speed progressive web app directly in your browser, or download the official
+              Android APK file hosted directly on our CINOVA domain. Fast, lightweight, and automatically updatable.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-1 text-xs text-[#746971]">
               <span className="flex items-center gap-1.5 text-[#AAA0A7]">
+                <Tag className="w-3.5 h-3.5 text-[#FF385B]" />
+                <span className="font-semibold text-white">{displayVersion}</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5 text-[#AAA0A7]">
                 <ShieldCheck className="w-4 h-4 text-[#E11D48]" />
-                Direct Release APK (5.8 MB)
+                Direct Release APK ({displaySize})
               </span>
               <span>•</span>
               <span className="flex items-center gap-1.5 text-[#AAA0A7]">
@@ -113,9 +140,9 @@ export default function AppDownloadBanner() {
               )}
             </button>
 
-            {/* 2. Download Android App Button (Direct standalone APK) */}
+            {/* 2. Download Android App Button (Self-hosted APK directly from CINOVA domain) */}
             <a
-              href={directApkUrl}
+              href={selfHostedApkUrl}
               download="CINOVA.apk"
               className="min-h-[50px] px-6 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 bg-[#160B10]/90 hover:bg-[#200D16] border border-[#E11D48]/55 hover:border-[#FF385B] text-[#F5F1F3] transition-all duration-200 shadow-md hover:shadow-[0_8px_20px_rgba(225,29,72,0.25)] active:scale-[0.98]"
             >

@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import PlaybackAuthGate from "@/components/PlaybackAuthGate";
 import PwaManager from "@/components/PwaManager";
+import AndroidUpdateChecker from "@/components/AndroidUpdateChecker";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -30,6 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <BottomNav />
       <PlaybackAuthGate />
       <PwaManager />
+      <AndroidUpdateChecker />
     </>
   );
 }

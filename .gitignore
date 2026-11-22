@@ -33,6 +33,10 @@ yarn-error.log*
 .env
 *.pem
 *.key
+*.keystore
+*.jks
+*-base64.txt
+cinova-keystore-base64.txt
 
 # vercel
 .vercel

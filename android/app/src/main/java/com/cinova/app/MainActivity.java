@@ -10,6 +10,18 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Inject Native Bridge into Capacitor WebView for In-App Updates
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            WebView webView = getBridge().getWebView();
+            webView.addJavascriptInterface(new CinovaNativeBridge(this, webView), "CinovaNativeBridge");
+            
+            // Append CINOVA identification to User Agent
+            String defaultUa = webView.getSettings().getUserAgentString();
+            if (defaultUa != null && !defaultUa.contains("CINOVA-Android")) {
+                webView.getSettings().setUserAgentString(defaultUa + " CINOVA-Android/" + BuildConfig.VERSION_NAME);
+            }
+        }
+
         // Hardware back button navigation: navigate WebView history
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override

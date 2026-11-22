@@ -64,25 +64,26 @@ jobs:
           git commit -m "chore(ci): capture build diagnostic log" || true
           git push -f origin ci-diagnostics || true
 
-      - name: Locate and Sign Release APK for Direct Installation
+      - name: Locate, Sign and Verify Release APK with Persistent Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'CinovaSecureRelease2026!' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'cinova' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'CinovaSecureRelease2026!' }}
         run: |
           mkdir -p apk-output
 
-          echo "=== All Generated Build Outputs ==="
-          find android/app/build/outputs/apk -type f -ls
-
-          # Find release APK
+          echo "=== Locating Build Output APK ==="
           RELEASE_APK=$(find android/app/build/outputs/apk -name "*release*.apk" | head -n 1)
           if [ -z "$RELEASE_APK" ]; then
             RELEASE_APK=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
           fi
 
-          echo "Found Target APK: $RELEASE_APK"
-
           if [ -z "$RELEASE_APK" ]; then
             echo "ERROR: No release APK found!"
             exit 1
           fi
+          echo "Found Target APK: $RELEASE_APK"
 
           # Locate apksigner in preinstalled Android SDK build-tools
           SDK_DIR="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
@@ -92,23 +93,29 @@ jobs:
           fi
           echo "Using apksigner: $APKSIGNER"
 
-          # Generate an ephemeral CI signing keystore
-          keytool -genkeypair -v \
-            -keystore ci-release.keystore \
-            -alias cinova \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass cinova123 \
-            -keypass cinova123 \
-            -dname "CN=CINOVA, OU=Mobile, O=CINOVA OTT, L=Mumbai, ST=MH, C=IN"
+          # Prepare Persistent Release Keystore
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Restoring permanent release keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          else
+            echo "Signing with release keystore..."
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=CINOVA, OU=Mobile, O=CINOVA OTT, L=Mumbai, ST=MH, C=IN"
+          fi
 
-          # Sign release APK with Android v2 + v3 signature schemes for instant phone installation
+          # Sign release APK with Android v2 + v3 signature schemes for seamless update & phone installation
           $APKSIGNER sign \
-            --ks ci-release.keystore \
-            --ks-key-alias cinova \
-            --ks-pass pass:cinova123 \
-            --key-pass pass:cinova123 \
+            --ks release.keystore \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
             --out apk-output/CINOVA.apk \
             "$RELEASE_APK"
 
@@ -116,9 +123,34 @@ jobs:
           echo "=== Verifying signed release APK ==="
           $APKSIGNER verify --verbose apk-output/CINOVA.apk
 
+          echo "=== Certificate Fingerprint ==="
+          keytool -printcert -jarfile apk-output/CINOVA.apk
+
           echo "=== Final APK Artifacts ==="
           ls -lh apk-output/
           stat -c "Generated APK: %n | Exact File Size: %s bytes" apk-output/CINOVA.apk
+
+      - name: Update Repository APK and Version Metadata
+        if: startsWith(github.ref, 'refs/heads/main')
+        run: |
+          APK_SIZE=$(stat -c%s apk-output/CINOVA.apk)
+          APK_SHA=$(sha256sum apk-output/CINOVA.apk | awk '{print $1}')
+          echo "New APK Size: $APK_SIZE bytes | SHA256: $APK_SHA"
+
+          cp apk-output/CINOVA.apk ./public/CINOVA.apk
+          cp apk-output/CINOVA.apk ./CINOVA.apk
+
+          # Update src/data/app-version.json with dynamic verified metadata
+          node -e "
+            const fs = require('fs');
+            const file = 'src/data/app-version.json';
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            data.apkSize = $APK_SIZE;
+            data.sha256 = '$APK_SHA';
+            data.releasedAt = new Date().toISOString();
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+            console.log('Updated app-version.json successfully');
+          "
 
       - name: Upload CINOVA.apk as GitHub Actions Artifact
         uses: actions/upload-artifact@v4

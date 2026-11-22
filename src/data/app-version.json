@@ -1,0 +1,11 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "minSupportedVersionCode": 1,
+  "apkUrl": "https://cinova.nishuminecraft01.workers.dev/CINOVA.apk",
+  "apkSize": 3239069,
+  "sha256": "3AE19C68C2A1D5D660297EEC0158D3A007B8FE5A392919BDA7F69513C8234BF4",
+  "releaseNotes": "• Integrated automated in-app update system\n• Enhanced 4K streaming player with instant episode switcher\n• Fullscreen playback fixes and server redundancy cluster\n• Performance optimizations and stability improvements",
+  "releasedAt": "2026-11-22T00:00:00.000Z",
+  "mandatory": false
+}
