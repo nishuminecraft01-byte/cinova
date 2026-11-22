@@ -1,6 +1,9 @@
 name: Build CINOVA Android APK
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -124,6 +127,12 @@ jobs:
           echo "=== Verifying signed release APK ==="
           $APKSIGNER verify --verbose apk-output/CINOVA.apk
 
+          echo "=== Verifying Android App Package Metadata ==="
+          AAPT=$(find $SDK_DIR/build-tools -name aapt 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$AAPT" ]; then
+            $AAPT dump badging apk-output/CINOVA.apk | grep -E "package: name|versionCode|versionName"
+          fi
+
           echo "=== Certificate Fingerprint ==="
           keytool -printcert -jarfile apk-output/CINOVA.apk
 
@@ -140,28 +149,3 @@ jobs:
           name: CINOVA-apk
           path: apk-output/CINOVA.apk
           retention-days: 30
-
-      - name: Publish Standalone CINOVA.apk to GitHub Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/heads/main')
-        with:
-          tag_name: apk-latest
-          name: "CINOVA Android Release APK"
-          body: "Direct standalone download of CINOVA.apk for Android devices. No zip extraction needed."
-          files: apk-output/CINOVA.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push Standalone CINOVA.apk to release-apk branch
-        if: startsWith(github.ref, 'refs/heads/main')
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan release-apk 2>/dev/null || git checkout -B release-apk
-          git rm -rf . > /dev/null 2>&1 || true
-          cp apk-output/CINOVA.apk ./CINOVA.apk
-          git add CINOVA.apk
-          git commit -m "chore(release): standalone CINOVA.apk binary" || true
-          git push -f origin release-apk || true
