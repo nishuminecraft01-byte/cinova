@@ -54,7 +54,7 @@ public class MainActivity extends BridgeActivity {
             // Append CINOVA identification to User Agent
             String defaultUa = webView.getSettings().getUserAgentString();
             if (defaultUa != null && !defaultUa.contains("CINOVA-Android")) {
-                String appVer = "1.1.0";
+                String appVer = "1.1.1";
                 try {
                     appVer = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
                 } catch (Exception ignored) {}

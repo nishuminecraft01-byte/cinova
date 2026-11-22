@@ -57,7 +57,7 @@ export default function AppDownloadBanner() {
   };
 
   const selfHostedApkUrl = "/CINOVA.apk";
-  const displayVersion = appVersion?.versionName ? `v${appVersion.versionName}` : "v1.1.0";
+  const displayVersion = appVersion?.versionName ? `v${appVersion.versionName}` : "v1.1.1";
   const displaySize = appVersion?.apkSize
     ? `${(appVersion.apkSize / (1024 * 1024)).toFixed(1)} MB`
     : "3.2 MB";
