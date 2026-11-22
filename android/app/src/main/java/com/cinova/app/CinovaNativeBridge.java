@@ -15,6 +15,8 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.core.content.FileProvider;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import java.io.File;
 
 public class CinovaNativeBridge {
@@ -34,12 +36,28 @@ public class CinovaNativeBridge {
 
     @JavascriptInterface
     public int getVersionCode() {
-        return BuildConfig.VERSION_CODE;
+        if (activity == null) return 1;
+        try {
+            PackageInfo pInfo = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                return (int) pInfo.getLongVersionCode();
+            } else {
+                return pInfo.versionCode;
+            }
+        } catch (Exception e) {
+            return 1;
+        }
     }
 
     @JavascriptInterface
     public String getVersionName() {
-        return BuildConfig.VERSION_NAME;
+        if (activity == null) return "1.0.0";
+        try {
+            PackageInfo pInfo = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
+            return pInfo.versionName != null ? pInfo.versionName : "1.0.0";
+        } catch (Exception e) {
+            return "1.0.0";
+        }
     }
 
     @JavascriptInterface
