@@ -8,10 +8,10 @@ import {
   Film,
   Tv,
   Sparkles,
+  Music,
   LayoutGrid,
   Bookmark,
   Search,
-  Bell,
   Menu,
   X,
   Check,
@@ -44,7 +44,6 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +76,6 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setMobileSearchOpen(false);
-    setNotificationsOpen(false);
     setProfileDropdownOpen(false);
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -92,18 +90,17 @@ export default function Navbar() {
   }, [mobileSearchOpen]);
 
   useEffect(() => {
-    if (!mobileMenuOpen && !mobileSearchOpen && !notificationsOpen && !profileDropdownOpen) return;
+    if (!mobileMenuOpen && !mobileSearchOpen && !profileDropdownOpen) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setMobileMenuOpen(false);
         setMobileSearchOpen(false);
-        setNotificationsOpen(false);
         setProfileDropdownOpen(false);
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [mobileMenuOpen, mobileSearchOpen, notificationsOpen, profileDropdownOpen]);
+  }, [mobileMenuOpen, mobileSearchOpen, profileDropdownOpen]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +122,7 @@ export default function Navbar() {
     { label: "Movies", href: "/movies", icon: Film, active: pathname.startsWith("/movies") || pathname.startsWith("/movie/") },
     { label: "Series", href: "/series", icon: Tv, active: pathname.startsWith("/series") },
     { label: "Anime", href: "/search?type=anime", icon: Sparkles, active: isAnimeSearch || pathname.startsWith("/anime/") },
+    { label: "Music", href: "/music", icon: Music, active: pathname.startsWith("/music") },
     { label: "Categories", href: "/categories", icon: LayoutGrid, active: pathname.startsWith("/categories") },
     { label: "Plans", href: "/pricing", icon: Crown, active: pathname.startsWith("/pricing") },
   ];
@@ -189,7 +187,7 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right: Search Input, Ask AI, Notifications & User Profile */}
+          {/* Right: Search Input, Ask AI & User Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
             {/* Rounded Dark Search Field (Desktop/Tablet) */}
             <form
@@ -213,7 +211,6 @@ export default function Navbar() {
               onClick={() => {
                 setMobileSearchOpen((prev) => !prev);
                 setMobileMenuOpen(false);
-                setNotificationsOpen(false);
                 setProfileDropdownOpen(false);
               }}
               className={`md:hidden w-9 h-9 rounded-full flex items-center justify-center border transition-colors ${
@@ -237,62 +234,12 @@ export default function Navbar() {
               <span className="hidden sm:inline lg:hidden xl:inline whitespace-nowrap">Ask AI</span>
             </button>
 
-            {/* Notifications Dropdown (shown in top bar on sm+ so narrow phone header stays clean) */}
-            <div className="relative hidden sm:block">
-              <button
-                onClick={() => {
-                  setNotificationsOpen(!notificationsOpen);
-                  setProfileDropdownOpen(false);
-                }}
-                className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#160B10] text-[#AAA0A7] hover:text-[#F5F1F3] transition-colors border border-transparent hover:border-[rgba(155,25,57,0.25)]"
-                aria-label="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-              </button>
-
-              {notificationsOpen && (
-                <div className="fixed sm:absolute right-3 sm:right-0 top-16 sm:top-auto sm:mt-2.5 w-[calc(100vw-1.5rem)] max-w-80 rounded-xl bg-[#10080C] border border-[rgba(155,25,57,0.28)] shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-4 space-y-3 z-50 text-xs animate-modal-in">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-[rgba(155,25,57,0.18)]">
-                    <span className="font-bold text-[#F5F1F3] uppercase tracking-wider text-[11px]">
-                      Notifications
-                    </span>
-                    <span className="text-[10px] text-[#746971] font-medium">All caught up</span>
-                  </div>
-
-                  <p className="text-[11px] text-[#AAA0A7] leading-relaxed">
-                    No unread account alerts right now. Explore featured titles from the catalog below:
-                  </p>
-
-                  <div className="space-y-2">
-                    <Link
-                      href="/movie/tmdb-635302"
-                      onClick={() => setNotificationsOpen(false)}
-                      className="block p-2.5 rounded-lg bg-[#160B10] hover:bg-[#1D0C13] border border-[rgba(155,25,57,0.18)] transition-colors"
-                    >
-                      <p className="font-semibold text-[#F5F1F3]">Demon Slayer: Mugen Train</p>
-                      <p className="text-[#AAA0A7] text-[11px] mt-0.5">Featured in CINOVA Catalog</p>
-                    </Link>
-
-                    <Link
-                      href="/anime/tmdb-127532"
-                      onClick={() => setNotificationsOpen(false)}
-                      className="block p-2.5 rounded-lg bg-[#160B10] hover:bg-[#1D0C13] border border-[rgba(155,25,57,0.18)] transition-colors"
-                    >
-                      <p className="font-semibold text-[#F5F1F3]">Solo Leveling</p>
-                      <p className="text-[#AAA0A7] text-[11px] mt-0.5">Popular Anime Series</p>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* User Profile / Login Button */}
             {user ? (
               <div className="relative">
                 <button
                   onClick={() => {
                     setProfileDropdownOpen(!profileDropdownOpen);
-                    setNotificationsOpen(false);
                   }}
                   className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full border border-[rgba(155,25,57,0.3)] hover:border-[#E11D48]/60 transition-all bg-[#160B10]/90"
                   aria-label="Open account menu"
@@ -473,6 +420,13 @@ export default function Navbar() {
                   className="px-3 py-1.5 rounded-full bg-[#160B10] border border-[rgba(155,25,57,0.26)] text-[#AAA0A7] whitespace-nowrap"
                 >
                   Anime
+                </Link>
+                <Link
+                  href="/music"
+                  onClick={() => setMobileSearchOpen(false)}
+                  className="px-3 py-1.5 rounded-full bg-[#160B10] border border-[rgba(155,25,57,0.26)] text-[#AAA0A7] whitespace-nowrap"
+                >
+                  Music
                 </Link>
               </div>
             </div>

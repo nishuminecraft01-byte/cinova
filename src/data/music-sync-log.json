@@ -1,0 +1,25 @@
+{
+  "id": "sync-1795454716529",
+  "triggeredBy": "MANUAL_ADMIN",
+  "startedAt": "2026-11-23T17:25:16.529Z",
+  "finishedAt": "2026-11-23T17:25:16.530Z",
+  "status": "SUCCESS",
+  "discoveredCount": 0,
+  "duplicateCount": 11,
+  "rejectedCount": 0,
+  "regionsScanned": [
+    "IN",
+    "US",
+    "GB"
+  ],
+  "languagesScanned": [
+    "hindi",
+    "english",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "malayalam"
+  ],
+  "quotaUsedApprox": 0,
+  "notes": "Curated discovery catalogue verified. (Configure YOUTUBE_API_KEY for live regional chart discovery)."
+}

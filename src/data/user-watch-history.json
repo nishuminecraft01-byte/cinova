@@ -1,0 +1,57 @@
+{
+  "test_user_bench_1795466153512": [
+    {
+      "movieId": "tmdb-series-77",
+      "contentId": "tmdb-series-77",
+      "title": "Breaking Bad",
+      "contentType": "series",
+      "posterUrl": "",
+      "backdropUrl": "",
+      "seasonNumber": 1,
+      "episodeNumber": 2,
+      "season": 1,
+      "episode": 2,
+      "episodeTitle": "Cat's in the Bag...",
+      "progressSeconds": 1500,
+      "durationSeconds": 3200,
+      "progressPercentage": 47,
+      "completed": false,
+      "lastWatched": "2026-11-23T20:35:53.582Z",
+      "userId": "test_user_bench_1795466153512"
+    },
+    {
+      "movieId": "tmdb-series-77",
+      "contentId": "tmdb-series-77",
+      "title": "Breaking Bad",
+      "contentType": "series",
+      "posterUrl": "",
+      "backdropUrl": "",
+      "seasonNumber": 1,
+      "episodeNumber": 1,
+      "season": 1,
+      "episode": 1,
+      "episodeTitle": "Pilot",
+      "progressSeconds": 900,
+      "durationSeconds": 3400,
+      "progressPercentage": 26,
+      "completed": false,
+      "lastWatched": "2026-11-23T20:35:53.574Z",
+      "userId": "test_user_bench_1795466153512"
+    },
+    {
+      "movieId": "tmdb-101",
+      "contentId": "tmdb-101",
+      "title": "Interstellar",
+      "contentType": "movie",
+      "posterUrl": "",
+      "backdropUrl": "",
+      "episodeTitle": "",
+      "progressSeconds": 8800,
+      "durationSeconds": 9600,
+      "progressPercentage": 92,
+      "completed": false,
+      "lastWatched": "2026-11-23T20:35:53.531Z",
+      "userId": "test_user_bench_1795466153512"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { SAMPLE_MOVIES } from "@/data/movies";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cinova.stream";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cinova.pages.dev";
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -19,6 +19,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     {
       url: `${siteUrl}/series`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${siteUrl}/music`,
       lastModified: new Date(),
       changeFrequency: "daily",
       priority: 0.9,

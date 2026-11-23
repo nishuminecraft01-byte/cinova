@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'CINOVA',
   webDir: 'android-shell',
   server: {
-    url: 'https://cinova.nishuminecraft01.workers.dev',
+    url: 'https://cinova.pages.dev',
     cleartext: false,
     androidScheme: 'https',
   },

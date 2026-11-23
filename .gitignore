@@ -15,12 +15,16 @@
 /out/
 /build
 /dist/
+/pages-dist/*
+!/pages-dist/_worker.js
 .wrangler/
 
 # local runtime data & cache
 /.cinova-data/
 *.tsbuildinfo
 next-env.d.ts
+scratch/
+.vscode/
 
 # debug & logs
 *.log

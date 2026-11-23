@@ -3,6 +3,7 @@ import "./globals.css";
 import AppShell from "@/components/AppShell";
 import { AuthProvider } from "@/context/AuthContext";
 import { WatchlistProvider } from "@/context/WatchlistContext";
+import { MusicProvider } from "@/context/MusicContext";
 
 export const viewport: Viewport = {
   themeColor: "#080506",
@@ -13,6 +14,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cinova.pages.dev"),
+  alternates: {
+    canonical: "https://cinova.pages.dev",
+  },
   title: "CINOVA — Stories. Anytime. Anywhere.",
   description:
     "Experience futuristic cinematic streaming on CINOVA. Stream global 4K movies, acclaimed series, and anime in Dolby Atmos.",
@@ -53,7 +58,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CINOVA — Stories. Anytime. Anywhere.",
     description: "Stream global 4K movies, exclusive series, and anime on CINOVA.",
+    url: "https://cinova.pages.dev",
     type: "website",
+  },
+  verification: {
+    google: "VKYmhO85FDZQZXp_zLRQA5hnnhBML9p33FhhN6C43zk",
   },
 };
 
@@ -101,7 +110,9 @@ export default function RootLayout({
       <body className="bg-[#080506] text-[#F5F1F3] min-h-screen flex flex-col font-sans selection:bg-[#E11D48] selection:text-[#F5F1F3]">
         <AuthProvider>
           <WatchlistProvider>
-            <AppShell>{children}</AppShell>
+            <MusicProvider>
+              <AppShell>{children}</AppShell>
+            </MusicProvider>
           </WatchlistProvider>
         </AuthProvider>
       </body>

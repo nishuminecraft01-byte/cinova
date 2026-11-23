@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Suspense } from "react";
+import React, { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Film, Sparkles, Flame, Globe2, ArrowRight, Play } from "lucide-react";
@@ -37,6 +37,12 @@ function MoviesContent() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("All");
   const [selectedSort, setSelectedSort] = useState<string>("popular");
   const [modalMovie, setModalMovie] = useState<Movie | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(24);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [selectedIndustry, selectedGenre, selectedLanguage, selectedSort]);
 
   // Filter feature films
   const filteredMovies = useMemo(() => {
@@ -133,15 +139,14 @@ function MoviesContent() {
           <button
             key={id}
             onClick={() => setSelectedIndustry(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${
-              selectedIndustry === id
-                ? isEmerald
-                  ? "bg-gradient-to-r from-emerald-800 to-emerald-600 border-emerald-500/50 text-white shadow-[0_4px_14px_rgba(16,185,129,0.35)]"
-                  : "bg-gradient-to-r from-[#A30D32] to-[#E11D48] border-[#E11D48]/50 text-[#F5F1F3] shadow-[0_4px_14px_rgba(163,13,50,0.35)]"
-                : isEmerald
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${selectedIndustry === id
+              ? isEmerald
+                ? "bg-gradient-to-r from-emerald-800 to-emerald-600 border-emerald-500/50 text-white shadow-[0_4px_14px_rgba(16,185,129,0.35)]"
+                : "bg-gradient-to-r from-[#A30D32] to-[#E11D48] border-[#E11D48]/50 text-[#F5F1F3] shadow-[0_4px_14px_rgba(163,13,50,0.35)]"
+              : isEmerald
                 ? "bg-[#0A1A12] text-emerald-400 hover:text-white hover:bg-[#0E2A1D] border-emerald-500/30"
                 : "bg-[#160B10] text-[#AAA0A7] hover:text-[#F5F1F3] hover:bg-[#1D0C13] border-[rgba(155,25,57,0.22)]"
-            }`}
+              }`}
           >
             <Icon className={`w-3.5 h-3.5 ${isEmerald && selectedIndustry !== id ? "text-emerald-400" : ""}`} />
             {label}
@@ -206,7 +211,9 @@ function MoviesContent() {
 
       {/* Count & Status */}
       <div className="flex items-center justify-between text-xs text-[#AAA0A7] mb-4">
-        <span>Showing {filteredMovies.length} movies</span>
+        <span>
+          Showing {Math.min(visibleCount, filteredMovies.length)} of {filteredMovies.length} movies
+        </span>
         <span className="text-[#FF385B] font-semibold uppercase tracking-wider">
           {selectedIndustry !== "all" ? selectedIndustry : "All Genres"}
         </span>
@@ -214,7 +221,7 @@ function MoviesContent() {
 
       {/* Movies Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
-        {filteredMovies.map((movie) => (
+        {filteredMovies.slice(0, visibleCount).map((movie) => (
           <MovieCard
             key={movie.id}
             movie={movie}
@@ -224,6 +231,17 @@ function MoviesContent() {
           />
         ))}
       </div>
+
+      {visibleCount < filteredMovies.length && (
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 24, filteredMovies.length))}
+            className="px-6 py-2.5 rounded-full bg-[#160B10] hover:bg-[#1D0C13] border border-[rgba(155,25,57,0.35)] hover:border-[#E11D48] text-[#F5F1F3] text-xs font-semibold transition-all shadow-md active:scale-95"
+          >
+            Load More Movies ({filteredMovies.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       {filteredMovies.length === 0 && (
         <div className="text-center py-20 text-[#AAA0A7]">

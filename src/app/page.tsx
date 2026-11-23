@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Play, Clock, ChevronRight, Shuffle } from "lucide-react";
+import { Play, Clock, ChevronRight, Shuffle, X, History } from "lucide-react";
 import HeroBanner from "@/components/HeroBanner";
 import MovieRow from "@/components/MovieRow";
 import Top10Row from "@/components/Top10Row";
@@ -143,7 +143,7 @@ function shuffleList<T>(items: T[]): T[] {
 }
 
 export default function HomePage() {
-  const { movies, continueWatching, getMovieById } = useWatchlist();
+  const { movies, continueWatching, getMovieById, removeFromHistory } = useWatchlist();
   const [modalMovie, setModalMovie] = useState<Movie | null>(null);
   const [randomizedHero, setRandomizedHero] = useState<Movie[] | null>(null);
   const [randomizedRecommended, setRandomizedRecommended] = useState<Movie[] | null>(null);
@@ -247,23 +247,37 @@ export default function HomePage() {
     };
   }, [movies]);
 
-  // Continue watching resolved movies
-  const continueItems = useMemo(
-    () =>
-      continueWatching
-        .map((cw) => {
-          const movie = getMovieById(cw.movieId);
-          return movie ? { ...cw, movie } : null;
-        })
-        .filter(Boolean) as Array<{
-        movieId: string;
-        progressSeconds: number;
-        durationSeconds: number;
-        completed: boolean;
-        movie: NonNullable<ReturnType<typeof getMovieById>>;
-      }>,
-    [continueWatching, getMovieById]
-  );
+  // Continue watching resolved items (shows movies and series with exact season/episode state)
+  const continueItems = useMemo(() => {
+    return continueWatching
+      .filter((cw) => !cw.completed && cw.progressSeconds > 10 && (cw.progressPercentage ?? 0) < 95)
+      .map((cw) => {
+        const foundMovie = getMovieById(cw.movieId);
+        const resolvedTitle = foundMovie?.title || cw.title || "CINOVA Title";
+        const resolvedImage =
+          cw.backdropUrl ||
+          cw.posterUrl ||
+          foundMovie?.backdropUrl ||
+          foundMovie?.posterUrl ||
+          "";
+        const sNum = cw.seasonNumber ?? cw.season;
+        const eNum = cw.episodeNumber ?? cw.episode;
+        const watchHref =
+          sNum && eNum
+            ? `/watch/${cw.movieId}?season=${sNum}&ep=${eNum}`
+            : `/watch/${cw.movieId}`;
+
+        return {
+          ...cw,
+          title: resolvedTitle,
+          image: resolvedImage,
+          quality: foundMovie?.quality || "1080p FHD",
+          watchHref,
+          sNum,
+          eNum,
+        };
+      });
+  }, [continueWatching, getMovieById]);
 
   return (
     <div className="relative min-h-screen cinova-atmosphere bg-[#080506] text-[#F5F1F3] overflow-x-hidden">
@@ -284,37 +298,76 @@ export default function HomePage() {
         {/* Continue Watching (shown when user has in-progress titles) */}
         {continueItems.length > 0 && (
           <section className="relative px-4 sm:px-6 lg:px-8 max-w-[1380px] mx-auto">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-[3px] h-5 bg-[#E11D48] rounded-full" />
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-[#F5F1F3]">
-                Continue Watching
-              </h2>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-[3px] h-5 bg-[#E11D48] rounded-full" />
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-[#F5F1F3]">
+                  Continue Watching
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#650A20]/50 text-[#FF385B] border border-[#E11D48]/30">
+                  {continueItems.length}
+                </span>
+              </div>
+              <Link
+                href="/history"
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#AAA0A7] hover:text-[#FF385B] transition-colors"
+              >
+                <span>Full History</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
             <div className="flex items-center gap-3.5 overflow-x-auto no-scrollbar py-1.5">
-              {continueItems.map(({ movie, progressSeconds, durationSeconds }) => {
-                const progressPct = Math.min(
-                  100,
-                  Math.round((progressSeconds / (durationSeconds || 1)) * 100)
-                );
+              {continueItems.map((item) => {
+                const totalDur = item.durationSeconds || 1;
+                const progressPct =
+                  typeof item.progressPercentage === "number"
+                    ? item.progressPercentage
+                    : Math.min(100, Math.round((item.progressSeconds / totalDur) * 100));
+
                 return (
                   <div
-                    key={movie.id}
+                    key={`${item.movieId}-${item.sNum || 0}-${item.eNum || 0}`}
                     className="group relative flex-shrink-0 w-[244px] sm:w-[272px] bg-[#160B10] rounded-xl overflow-hidden border border-[rgba(155,25,57,0.22)] transition-colors duration-200 hover:border-[#E11D48]/55 shadow-[0_8px_22px_rgba(0,0,0,0.55)]"
                   >
                     <div className="relative aspect-video w-full overflow-hidden bg-[#10080C]">
                       <CinovaImage
-                        src={movie.backdropUrl || movie.posterUrl}
-                        alt={movie.title}
-                        fallbackText={movie.title}
+                        src={item.image}
+                        alt={item.title}
+                        fallbackText={item.title}
                         aspect="backdrop"
                         tmdbSize="w500"
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                       />
+
+                      {/* Episode Badge if Series */}
+                      {item.sNum && item.eNum && (
+                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-xs border border-white/10 text-[10px] font-bold text-white tracking-wide">
+                          S{item.sNum} : E{item.eNum}
+                        </div>
+                      )}
+
+                      {/* Direct Remove Item Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeFromHistory(item.movieId, item.sNum, item.eNum);
+                        }}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#E11D48] text-[#AAA0A7] hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all border border-white/10"
+                        title="Remove from Continue Watching"
+                        aria-label="Remove item"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Center Play Overlay */}
                       <div className="absolute inset-0 bg-[#080506]/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link
-                          href={`/watch/${movie.id}`}
+                          href={item.watchHref}
                           className="w-10 h-10 rounded-full bg-[#E11D48] hover:bg-[#FF385B] text-[#F5F1F3] flex items-center justify-center shadow-lg transition-transform active:scale-95"
+                          title="Resume playback"
                         >
                           <Play className="w-4 h-4 fill-[#F5F1F3] ml-0.5" />
                         </Link>
@@ -323,7 +376,7 @@ export default function HomePage() {
                       {/* Crimson Progress Bar */}
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#080506]/90">
                         <div
-                          className="h-full bg-[#E11D48]"
+                          className="h-full bg-gradient-to-r from-[#A30D32] to-[#FF385B]"
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
@@ -331,15 +384,15 @@ export default function HomePage() {
 
                     <div className="p-3">
                       <div className="flex items-center justify-between text-[11px] text-[#AAA0A7] mb-1">
-                        <span className="text-[#FF385B] font-semibold">{movie.quality}</span>
+                        <span className="text-[#FF385B] font-semibold">{item.quality}</span>
                         <span className="flex items-center gap-1 tabular-nums">
                           <Clock className="w-3 h-3" />
-                          {Math.floor(progressSeconds / 60)}m watched
+                          {Math.floor(item.progressSeconds / 60)}m ({progressPct}%)
                         </span>
                       </div>
-                      <Link href={`/watch/${movie.id}`}>
+                      <Link href={item.watchHref}>
                         <h4 className="text-xs sm:text-[13px] font-bold text-[#F5F1F3] hover:text-[#FF385B] transition-colors truncate">
-                          {movie.title}
+                          {item.title}
                         </h4>
                       </Link>
                     </div>

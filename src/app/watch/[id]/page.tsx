@@ -69,7 +69,7 @@ function WatchPlayerContent() {
   const movieId = (params?.id as string) || "";
 
   const { user, isLoading: authSessionLoading } = useAuth();
-  const { getMovieById, updateProgress, toggleWatchlist, isInWatchlist, movies } = useWatchlist();
+  const { getMovieById, updateProgress, continueWatching, toggleWatchlist, isInWatchlist, movies } = useWatchlist();
   const movie = getMovieById(movieId);
 
   const [tmdbDetail, setTmdbDetail] = useState<{
@@ -605,6 +605,7 @@ function WatchPlayerContent() {
         isTrackingRef.current = false;
         void sendWatchTimeEvent("end", { keepalive: true });
       }
+      recordCurrentWatchProgress(true);
     };
   }, [resolvedMovie, user?.id, user?.role, isUnlimited, isActivelyConsumingTime, sendWatchTimeEvent]);
 
@@ -728,24 +729,53 @@ function WatchPlayerContent() {
   const onLoadedMetadata = () => {
     if (!videoRef.current) return;
     const dur = videoRef.current.duration;
-    setDuration(dur);
+    if (dur && !isNaN(dur)) setDuration(dur);
 
-    // Resume playback if previously watched
+    // Multi-Device Resumable Playback Check (synced from Cloud & local store)
     if (!hasResumedRef.current) {
       hasResumedRef.current = true;
       try {
-        const saved = localStorage.getItem("cinova_continue_watching");
-        if (saved) {
-          const list = JSON.parse(saved);
-          const prev = list.find(
-            (item: { movieId: string; progressSeconds: number }) =>
-              item.movieId === movieId || item.movieId === resolvedMovie.id
-          );
-          if (prev && prev.progressSeconds > 15 && dur > 0 && prev.progressSeconds < dur - 30) {
-            videoRef.current.currentTime = prev.progressSeconds;
-            setCurrentTime(prev.progressSeconds);
-            setResumeToast({ show: true, time: prev.progressSeconds });
-            setTimeout(() => setResumeToast(null), 6000);
+        const sNum = isTvType ? (Number(currentSeason) || 1) : undefined;
+        const eNum = isTvType ? (Number(currentEpisode) || 1) : undefined;
+
+        // Check active in-memory continueWatching first
+        const prev = continueWatching.find((item) => {
+          const matchesContent =
+            item.movieId === movieId ||
+            item.movieId === resolvedMovie.id ||
+            item.contentId === movieId ||
+            item.contentId === resolvedMovie.id;
+          if (!matchesContent) return false;
+          if (isTvType) {
+            return (item.seasonNumber ?? item.season ?? 1) === sNum && (item.episodeNumber ?? item.episode ?? 1) === eNum;
+          }
+          return true;
+        });
+
+        const targetSeconds = prev?.progressSeconds;
+        if (typeof targetSeconds === "number" && targetSeconds > 10 && dur > 0 && targetSeconds < dur - 30) {
+          videoRef.current.currentTime = targetSeconds;
+          setCurrentTime(targetSeconds);
+          setResumeToast({ show: true, time: targetSeconds });
+          setTimeout(() => setResumeToast(null), 7000);
+        } else {
+          // Fallback to localStorage check if offline
+          const saved = localStorage.getItem("cinova_continue_watching");
+          if (saved) {
+            const list = JSON.parse(saved);
+            const localPrev = Array.isArray(list)
+              ? list.find(
+                  (item: any) =>
+                    (item.movieId === movieId || item.movieId === resolvedMovie.id || item.contentId === movieId) &&
+                    (!isTvType || ((item.seasonNumber ?? item.season ?? 1) === sNum && (item.episodeNumber ?? item.episode ?? 1) === eNum))
+                )
+              : null;
+            if (localPrev && localPrev.progressSeconds > 10 && dur > 0 && localPrev.progressSeconds < dur - 30) {
+              videoRef.current.currentTime = localPrev.progressSeconds;
+              setCurrentTime(localPrev.progressSeconds);
+              setResumeToast({ show: true, time: localPrev.progressSeconds });
+              setTimeout(() => setResumeToast(null), 7000);
+            }
           }
         }
       } catch {
@@ -782,6 +812,9 @@ function WatchPlayerContent() {
 
   // Change episode with complete player and state cleanup
   const handleSelectEpisode = (seasonNum: number, episodeNum: number) => {
+    // Save current episode's progress immediately before transitioning
+    recordCurrentWatchProgress(true);
+    hasResumedRef.current = false;
     setCurrentSeason(seasonNum);
     setCurrentEpisode(episodeNum);
     if (videoRef.current) {
@@ -895,11 +928,41 @@ function WatchPlayerContent() {
     }, 3500);
   };
 
+  const recordCurrentWatchProgress = useCallback(
+    (immediateSync = false, isCompleted = false) => {
+      if (!videoRef.current || !resolvedMovie) return;
+      const cur = videoRef.current.currentTime;
+      const totalDur = videoRef.current.duration || duration || 1;
+
+      const sNum = isTvType ? Number(currentSeason) || 1 : undefined;
+      const eNum = isTvType ? Number(currentEpisode) || 1 : undefined;
+      const episodeObj =
+        isTvType && resolvedMovie.seasons
+          ? resolvedMovie.seasons
+              .find((s) => s.seasonNumber === sNum)
+              ?.episodes?.find((e) => e.episodeNumber === eNum)
+          : undefined;
+
+      updateProgress(resolvedMovie.id, Math.floor(cur), Math.floor(totalDur), {
+        title: resolvedMovie.title,
+        contentType: resolvedMovie.type,
+        posterUrl: episodeObj?.thumbnailUrl || resolvedMovie.posterUrl || resolvedMovie.backdropUrl,
+        backdropUrl: resolvedMovie.backdropUrl || resolvedMovie.posterUrl,
+        seasonNumber: sNum,
+        episodeNumber: eNum,
+        episodeTitle: episodeObj?.title || (isTvType ? `Episode ${eNum}` : undefined),
+        completed: isCompleted,
+        immediateSync,
+      });
+    },
+    [resolvedMovie, isTvType, currentSeason, currentEpisode, duration, updateProgress]
+  );
+
   const onTimeUpdate = () => {
     if (!videoRef.current) return;
     const cur = videoRef.current.currentTime;
     setCurrentTime(cur);
-    updateProgress(resolvedMovie.id, Math.floor(cur), Math.floor(videoRef.current.duration || 1));
+    recordCurrentWatchProgress(false);
     if (cur > 120 && showSkipIntro) setShowSkipIntro(false);
   };
 
@@ -1218,6 +1281,7 @@ function WatchPlayerContent() {
                 onPause={() => {
                   setIsPlaying(false);
                   setBuffering(false);
+                  recordCurrentWatchProgress(true);
                 }}
                 onWaiting={() => setBuffering(true)}
                 onStalled={() => setBuffering(true)}
@@ -1228,6 +1292,7 @@ function WatchPlayerContent() {
                 onEnded={() => {
                   setIsPlaying(false);
                   setBuffering(false);
+                  recordCurrentWatchProgress(true, true);
                 }}
                 onError={() => {
                   setStreamError("Stream connection error. Try switching servers.");

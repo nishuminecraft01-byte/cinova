@@ -8,6 +8,7 @@ import {
   Film,
   Tv,
   Sparkles,
+  Music,
   Bookmark,
   History,
   User,
@@ -43,6 +44,7 @@ export default function Sidebar() {
     { label: "Movies", href: "/movies", icon: Film, active: pathname.startsWith("/movies") || pathname.startsWith("/movie/") },
     { label: "Series", href: "/series", icon: Tv, active: pathname.startsWith("/series") },
     { label: "Anime", href: "/search?type=anime", icon: Sparkles, active: isAnimeSearch || pathname.startsWith("/anime/") },
+    { label: "Music", href: "/music", icon: Music, active: pathname.startsWith("/music") },
     {
       label: "My List",
       href: "/profile?tab=watchlist",

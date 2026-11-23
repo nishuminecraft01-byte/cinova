@@ -11,5 +11,8 @@
   "vars": {
     "NEXT_PUBLIC_SUPABASE_URL": "https://cokkdjkdudeedknjwmzh.supabase.co",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_OwzQUJsjKUDnO4JIbCvmIQ_OLidVyee"
+  },
+  "triggers": {
+    "crons": ["0 3 * * *"]
   }
 }

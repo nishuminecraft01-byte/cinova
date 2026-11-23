@@ -9,10 +9,24 @@ import BottomNav from "@/components/BottomNav";
 import PlaybackAuthGate from "@/components/PlaybackAuthGate";
 import PwaManager from "@/components/PwaManager";
 import AndroidUpdateChecker from "@/components/AndroidUpdateChecker";
+import MusicPlayer from "@/components/music/MusicPlayer";
+import FullScreenPlayer from "@/components/music/FullScreenPlayer";
+import MusicQueueDrawer from "@/components/music/MusicQueueDrawer";
+import LicensingNoticeModal from "@/components/music/LicensingNoticeModal";
+import YouTubePlayerModal from "@/components/music/YouTubePlayerModal";
+import { useMusic } from "@/context/MusicContext";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  const {
+    licensingNoticeTrack,
+    isLicensingModalOpen,
+    closeLicensingModal,
+    activeVideoTrack,
+    isVideoModalOpen,
+    closeVideoModal,
+  } = useMusic();
 
   useEffect(() => {
     if (typeof window !== "undefined" && (window as unknown as { CinovaNativeBridge?: Record<string, unknown> }).CinovaNativeBridge) {
@@ -57,6 +71,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Footer />
       </div>
       <BottomNav />
+      <MusicPlayer />
+      <FullScreenPlayer />
+      <MusicQueueDrawer />
+      <YouTubePlayerModal
+        song={activeVideoTrack}
+        isOpen={isVideoModalOpen}
+        onClose={closeVideoModal}
+      />
+      <LicensingNoticeModal
+        song={licensingNoticeTrack}
+        isOpen={isLicensingModalOpen}
+        onClose={closeLicensingModal}
+        onExploreIndependent={() => {
+          if (typeof window !== "undefined") {
+            const el = document.getElementById("free-independent-music");
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth" });
+            } else {
+              window.location.href = "/music#free-independent-music";
+            }
+          }
+        }}
+      />
       <PlaybackAuthGate />
       <PwaManager />
       <AndroidUpdateChecker />

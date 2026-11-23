@@ -63,7 +63,7 @@ export function LoginRequiredCard({
               Your CINOVA journey starts here.
             </h2>
             <p className="text-sm text-[#AAA0A7] leading-relaxed">
-              Create an account or sign in to start watching. Explore freely, but sign in to unlock playback.
+              Create an account or sign in to start streaming. Explore freely, but sign in to unlock free full-length playback.
             </p>
             {titleContext && (
               <p className="text-xs text-[#746971] pt-0.5">
@@ -117,17 +117,34 @@ export function LoginRequiredCard({
 export default function PlaybackAuthGate() {
   const { user, isLoading } = useAuth();
   const [pendingWatchUrl, setPendingWatchUrl] = useState<string | null>(null);
+  const [activeContextTitle, setActiveContextTitle] = useState<string | undefined>(undefined);
 
   const closeModal = useCallback(() => {
     setPendingWatchUrl(null);
+    setActiveContextTitle(undefined);
   }, []);
 
   useEffect(() => {
     // Close modal automatically if user logs in
     if (user && pendingWatchUrl) {
       setPendingWatchUrl(null);
+      setActiveContextTitle(undefined);
     }
   }, [user, pendingWatchUrl]);
+
+  // Listen for programmatic auth-gate triggers (e.g. from MusicContext)
+  useEffect(() => {
+    const handleAuthGateTrigger = (e: Event) => {
+      if (user || isLoading) return;
+      const customEvent = e as CustomEvent<{ returnTo?: string; titleContext?: string }>;
+      const returnTo = customEvent.detail?.returnTo || "/music";
+      setPendingWatchUrl(returnTo);
+      setActiveContextTitle(customEvent.detail?.titleContext);
+    };
+
+    window.addEventListener("cinova:auth-gate:open", handleAuthGateTrigger);
+    return () => window.removeEventListener("cinova:auth-gate:open", handleAuthGateTrigger);
+  }, [user, isLoading]);
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent) => {
@@ -175,6 +192,7 @@ export default function PlaybackAuthGate() {
     >
       <LoginRequiredCard
         returnTo={pendingWatchUrl}
+        titleContext={activeContextTitle}
         onContinueExploring={closeModal}
       />
     </div>

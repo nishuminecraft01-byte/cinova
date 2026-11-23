@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Suspense } from "react";
+import React, { useState, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Tv, Sparkles, Flame, Globe2, Film, ArrowRight, Play } from "lucide-react";
@@ -22,6 +22,11 @@ function SeriesContent() {
   const [selectedGenre, setSelectedGenre] = useState<string>("All");
   const [selectedSort, setSelectedSort] = useState<string>("popular");
   const [modalMovie, setModalMovie] = useState<Movie | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(24);
+
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [selectedCategory, selectedGenre, selectedSort]);
 
   const seriesList = useMemo(() => {
     return movies
@@ -174,7 +179,9 @@ function SeriesContent() {
 
       {/* Count & Status */}
       <div className="flex items-center justify-between text-xs text-[#AAA0A7] mb-4">
-        <span>Showing {seriesList.length} shows</span>
+        <span>
+          Showing {Math.min(visibleCount, seriesList.length)} of {seriesList.length} shows
+        </span>
         <span className="text-[#FF385B] font-semibold uppercase tracking-wider">
           {selectedCategory !== "all" ? selectedCategory : "All Series"}
         </span>
@@ -182,7 +189,7 @@ function SeriesContent() {
 
       {/* Series Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
-        {seriesList.map((series) => (
+        {seriesList.slice(0, visibleCount).map((series) => (
           <MovieCard
             key={series.id}
             movie={series}
@@ -192,6 +199,17 @@ function SeriesContent() {
           />
         ))}
       </div>
+
+      {visibleCount < seriesList.length && (
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => setVisibleCount((prev) => Math.min(prev + 24, seriesList.length))}
+            className="px-6 py-2.5 rounded-full bg-[#160B10] hover:bg-[#1D0C13] border border-[rgba(155,25,57,0.35)] hover:border-[#E11D48] text-[#F5F1F3] text-xs font-semibold transition-all shadow-md active:scale-95"
+          >
+            Load More Shows ({seriesList.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       {seriesList.length === 0 && (
         <div className="text-center py-20 text-[#AAA0A7]">

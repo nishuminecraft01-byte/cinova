@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Film, Tv, Bookmark } from "lucide-react";
+import { Home, Search, Film, Tv, Music, Bookmark } from "lucide-react";
 import { useWatchlist } from "@/context/WatchlistContext";
 
 export default function BottomNav() {
@@ -15,6 +15,7 @@ export default function BottomNav() {
     { label: "Search", href: "/search", icon: Search, active: pathname.startsWith("/search") },
     { label: "Movies", href: "/movies", icon: Film, active: pathname.startsWith("/movies") || pathname.startsWith("/movie/") },
     { label: "Series", href: "/series", icon: Tv, active: pathname.startsWith("/series") },
+    { label: "Music", href: "/music", icon: Music, active: pathname.startsWith("/music") },
     {
       label: "My List",
       href: "/profile?tab=watchlist",
@@ -31,7 +32,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0508]/95 backdrop-blur-xl border-t border-[rgba(155,25,57,0.24)] px-2 pt-1.5 shadow-[0_-8px_24px_rgba(0,0,0,0.65)]"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0508]/95 backdrop-blur-xl border-t border-[rgba(155,25,57,0.24)] px-1 sm:px-2 pt-1.5 shadow-[0_-8px_24px_rgba(0,0,0,0.65)]"
       style={{
         paddingBottom: "max(var(--safe-bottom, 0px), 8px)",
       }}
@@ -43,7 +44,7 @@ export default function BottomNav() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex flex-col items-center justify-center min-w-[56px] min-h-[50px] py-1.5 px-2.5 rounded-xl transition-colors relative active:scale-95 ${
+              className={`flex flex-col items-center justify-center min-w-[46px] min-h-[46px] py-1 px-1 sm:px-2 rounded-xl transition-colors relative active:scale-95 ${
                 item.active
                   ? "text-[#F5F1F3] font-semibold bg-[#650A20]/30"
                   : "text-[#AAA0A7] hover:text-[#F5F1F3]"
@@ -57,7 +58,7 @@ export default function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-0.5 leading-tight">{item.label}</span>
+              <span className="text-[10px] sm:text-[11px] mt-0.5 leading-tight">{item.label}</span>
             </Link>
           );
         })}

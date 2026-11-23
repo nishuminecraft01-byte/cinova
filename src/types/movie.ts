@@ -1,4 +1,4 @@
-export type ContentType = "movie" | "series" | "short";
+export type ContentType = "movie" | "series" | "short" | "anime";
 
 export interface CastMember {
   name: string;
@@ -128,12 +128,22 @@ export interface UserProfile {
 }
 
 export interface WatchProgress {
+  id?: string;
   movieId: string;
+  contentId?: string;
+  title?: string;
+  contentType?: ContentType;
+  posterUrl?: string;
+  backdropUrl?: string;
   progressSeconds: number;
   durationSeconds: number;
+  progressPercentage?: number;
   lastWatched: string;
   completed: boolean;
   serverId?: string;
   season?: number;
   episode?: number;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }

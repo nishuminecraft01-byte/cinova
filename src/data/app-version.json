@@ -2,7 +2,7 @@
   "versionCode": 3,
   "versionName": "1.1.1",
   "minSupportedVersionCode": 1,
-  "apkUrl": "https://cinova.nishuminecraft01.workers.dev/CINOVA.apk",
+  "apkUrl": "https://cinova.pages.dev/CINOVA.apk",
   "apkSize": 3243165,
   "sha256": "e1a9a2a968ae679c07a57b2ed9d5897cdd331293c9a868b343e3babb54622728",
   "releaseNotes": "• Integrated automated in-app update system\n• Enhanced 4K streaming player with instant episode switcher\n• Fullscreen playback fixes and server redundancy cluster\n• Performance optimizations and stability improvements",

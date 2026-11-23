@@ -1,9 +1,22 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { Movie, WatchProgress, CreatorSubmission } from "@/types/movie";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Movie, WatchProgress, CreatorSubmission, ContentType } from "@/types/movie";
 import { SAMPLE_MOVIES } from "@/data/movies";
 import { POPULAR_TMDB_CATALOG, convertCatalogItemToMovie } from "@/lib/tmdb";
+import { useAuth } from "@/context/AuthContext";
+
+export interface ProgressUpdateDetails {
+  title?: string;
+  contentType?: ContentType;
+  posterUrl?: string;
+  backdropUrl?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
+  completed?: boolean;
+  immediateSync?: boolean;
+}
 
 interface WatchlistContextType {
   watchlist: string[];
@@ -14,9 +27,15 @@ interface WatchlistContextType {
   removeFromWatchlist: (movieId: string) => void;
   toggleWatchlist: (movieId: string) => void;
   isInWatchlist: (movieId: string) => boolean;
-  updateProgress: (movieId: string, progressSeconds: number, durationSeconds: number) => void;
-  removeFromHistory: (movieId: string) => void;
+  updateProgress: (
+    movieId: string,
+    progressSeconds: number,
+    durationSeconds: number,
+    details?: ProgressUpdateDetails
+  ) => void;
+  removeFromHistory: (movieId: string, seasonNumber?: number, episodeNumber?: number) => void;
   clearHistory: () => void;
+  syncCloudHistory: () => Promise<void>;
   getMovieById: (id: string) => Movie | undefined;
   addMovie: (movie: Movie) => void;
   updateMovie: (movieId: string, updates: Partial<Movie>) => void;
@@ -30,10 +49,16 @@ interface WatchlistContextType {
 const WatchlistContext = createContext<WatchlistContextType | undefined>(undefined);
 
 export function WatchlistProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [continueWatching, setContinueWatching] = useState<WatchProgress[]>([]);
   const [movies, setMovies] = useState<Movie[]>(SAMPLE_MOVIES);
   const [submissions, setSubmissions] = useState<CreatorSubmission[]>([]);
+
+  // Throttling and debounce refs to prevent React state thrashing during high-frequency HTML5 playback
+  const lastStateUpdateRef = useRef<Map<string, number>>(new Map());
+  const pendingSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingPayloadsRef = useRef<Map<string, any>>(new Map());
 
   // Load from localStorage on mount and merge with verified catalog
   useEffect(() => {
@@ -181,41 +206,230 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
 
   const isInWatchlist = useCallback((movieId: string) => watchlistSet.has(movieId), [watchlistSet]);
 
-  const updateProgress = useCallback((movieId: string, progressSeconds: number, durationSeconds: number) => {
-    const isDone = durationSeconds > 0 && progressSeconds / durationSeconds > 0.95;
-    setContinueWatching((prev) => {
-      const existingIndex = prev.findIndex((item) => item.movieId === movieId);
-      const newRecord: WatchProgress = {
-        movieId,
-        progressSeconds,
-        durationSeconds,
+  // Synchronize authenticated user history from cloud database (/api/history)
+  const syncCloudHistory = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch("/api/history", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.success && data?.authenticated) {
+        const cloudItems: WatchProgress[] = Array.isArray(data.continueWatching)
+          ? data.continueWatching
+          : [];
+
+        setContinueWatching((prev) => {
+          const map = new Map<string, WatchProgress>();
+          // Cloud items take precedence
+          cloudItems.forEach((item) => {
+            const key = `${item.movieId}:${item.seasonNumber ?? 0}:${item.episodeNumber ?? 0}`;
+            map.set(key, item);
+          });
+          // Merge local items not in cloud yet
+          prev.forEach((item) => {
+            const key = `${item.movieId}:${item.seasonNumber ?? 0}:${item.episodeNumber ?? 0}`;
+            if (!map.has(key)) {
+              map.set(key, item);
+            }
+          });
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.lastWatched).getTime() - new Date(a.lastWatched).getTime()
+          );
+          try {
+            localStorage.setItem("cinova_continue_watching", JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    } catch (e) {
+      console.warn("[CINOVA Watchlist] History cloud sync error:", e);
+    }
+  }, [user?.id]);
+
+  // Automatically sync when user logs in / auth changes
+  useEffect(() => {
+    if (user?.id) {
+      syncCloudHistory();
+    } else {
+      // For logged out viewers, keep history local only
+      try {
+        const savedProgress = localStorage.getItem("cinova_continue_watching");
+        if (savedProgress) {
+          const parsed = JSON.parse(savedProgress);
+          if (Array.isArray(parsed)) setContinueWatching(parsed);
+        }
+      } catch {}
+    }
+  }, [user?.id, syncCloudHistory]);
+
+  // Flush pending watch progress payloads to the server
+  const flushPendingSync = useCallback(async () => {
+    if (pendingSyncTimerRef.current) {
+      clearTimeout(pendingSyncTimerRef.current);
+      pendingSyncTimerRef.current = null;
+    }
+
+    const payloads = Array.from(pendingPayloadsRef.current.values());
+    if (payloads.length === 0 || !user?.id) return;
+    pendingPayloadsRef.current.clear();
+
+    for (const payload of payloads) {
+      try {
+        fetch("/api/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(() => {});
+      } catch {}
+    }
+  }, [user?.id]);
+
+  // Cleanly flush on unload/pagehide
+  useEffect(() => {
+    const handleUnload = () => {
+      flushPendingSync();
+    };
+    window.addEventListener("pagehide", handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("pagehide", handleUnload);
+      window.removeEventListener("beforeunload", handleUnload);
+      flushPendingSync();
+    };
+  }, [flushPendingSync]);
+
+  const updateProgress = useCallback(
+    (
+      movieId: string,
+      progressSeconds: number,
+      durationSeconds: number,
+      details?: ProgressUpdateDetails
+    ) => {
+      if (!movieId) return;
+      const cleanId = movieId.trim();
+      const season = details?.seasonNumber;
+      const episode = details?.episodeNumber;
+      const itemKey = `${cleanId}:${season ?? 0}:${episode ?? 0}`;
+
+      const progressSec = Math.max(0, Math.floor(progressSeconds));
+      const durationSec = Math.max(0, Math.floor(durationSeconds));
+      const isDone = details?.completed ?? (durationSec > 0 && progressSec / durationSec >= 0.92);
+      const percentage = durationSec > 0 ? Math.min(100, Math.round((progressSec / durationSec) * 100)) : 0;
+
+      // Throttle React state updates to avoid re-rendering 4 times/sec
+      const lastSavedSec = lastStateUpdateRef.current.get(itemKey) ?? -999;
+      const hasSignificantChange = Math.abs(progressSec - lastSavedSec) >= 3 || isDone || details?.immediateSync;
+
+      const record: WatchProgress = {
+        movieId: cleanId,
+        contentId: cleanId,
+        title: details?.title,
+        contentType: details?.contentType || (season || episode ? "series" : "movie"),
+        posterUrl: details?.posterUrl,
+        backdropUrl: details?.backdropUrl,
+        seasonNumber: season,
+        episodeNumber: episode,
+        season,
+        episode,
+        episodeTitle: details?.episodeTitle,
+        progressSeconds: progressSec,
+        durationSeconds: durationSec,
+        progressPercentage: percentage,
         lastWatched: new Date().toISOString(),
         completed: isDone,
       };
-      let updated: WatchProgress[];
-      if (existingIndex > -1) {
-        updated = [...prev];
-        updated[existingIndex] = newRecord;
-      } else {
-        updated = [newRecord, ...prev];
-      }
-      localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
 
-  const removeFromHistory = useCallback((movieId: string) => {
-    setContinueWatching((prev) => {
-      const updated = prev.filter((item) => item.movieId !== movieId);
-      localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+      if (hasSignificantChange) {
+        lastStateUpdateRef.current.set(itemKey, progressSec);
+        setContinueWatching((prev) => {
+          const existingIndex = prev.findIndex(
+            (item) =>
+              (item.movieId === cleanId || item.contentId === cleanId) &&
+              (item.seasonNumber ?? 0) === (season ?? 0) &&
+              (item.episodeNumber ?? 0) === (episode ?? 0)
+          );
+          let updated: WatchProgress[];
+          if (existingIndex > -1) {
+            updated = [...prev];
+            updated[existingIndex] = { ...updated[existingIndex], ...record };
+          } else {
+            updated = [record, ...prev];
+          }
+          try {
+            localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+
+      // Queue network payload for logged-in user
+      if (user?.id) {
+        const payload = {
+          contentId: cleanId,
+          title: details?.title || "CINOVA Content",
+          contentType: details?.contentType || (season || episode ? "series" : "movie"),
+          posterUrl: details?.posterUrl,
+          backdropUrl: details?.backdropUrl,
+          seasonNumber: season,
+          episodeNumber: episode,
+          episodeTitle: details?.episodeTitle,
+          progressSeconds: progressSec,
+          durationSeconds: durationSec,
+          completed: isDone,
+        };
+
+        pendingPayloadsRef.current.set(itemKey, payload);
+
+        if (details?.immediateSync || isDone) {
+          flushPendingSync();
+        } else if (!pendingSyncTimerRef.current) {
+          pendingSyncTimerRef.current = setTimeout(() => {
+            flushPendingSync();
+          }, 15000); // Batched update approximately every 15-20 seconds
+        }
+      }
+    },
+    [user?.id, flushPendingSync]
+  );
+
+  const removeFromHistory = useCallback(
+    (movieId: string, seasonNumber?: number, episodeNumber?: number) => {
+      const cleanId = movieId.trim();
+      setContinueWatching((prev) => {
+        const updated = prev.filter((item) => {
+          if (item.movieId !== cleanId && item.contentId !== cleanId) return true;
+          if (typeof seasonNumber === "number" && item.seasonNumber !== seasonNumber) return true;
+          if (typeof episodeNumber === "number" && item.episodeNumber !== episodeNumber) return true;
+          return false;
+        });
+        try {
+          localStorage.setItem("cinova_continue_watching", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      if (user?.id) {
+        const seasonParam = typeof seasonNumber === "number" ? `&season=${seasonNumber}` : "";
+        const epParam = typeof episodeNumber === "number" ? `&episode=${episodeNumber}` : "";
+        fetch(`/api/history?contentId=${encodeURIComponent(cleanId)}${seasonParam}${epParam}`, {
+          method: "DELETE",
+        }).catch(() => {});
+      }
+    },
+    [user?.id]
+  );
 
   const clearHistory = useCallback(() => {
     setContinueWatching([]);
-    localStorage.removeItem("cinova_continue_watching");
-  }, []);
+    try {
+      localStorage.removeItem("cinova_continue_watching");
+    } catch {}
+
+    if (user?.id) {
+      fetch("/api/history?clearAll=true", { method: "DELETE" }).catch(() => {});
+    }
+  }, [user?.id]);
 
   // Strict O(1) movie resolver: matches active state or verified TMDB catalog by exact id / tmdbId
   const getMovieById = useCallback(
@@ -453,6 +667,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       updateProgress,
       removeFromHistory,
       clearHistory,
+      syncCloudHistory,
       getMovieById,
       addMovie,
       updateMovie,
@@ -474,6 +689,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
       updateProgress,
       removeFromHistory,
       clearHistory,
+      syncCloudHistory,
       getMovieById,
       addMovie,
       updateMovie,
